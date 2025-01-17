@@ -10,6 +10,8 @@ pico_sdk_init()
 
 add_executable(dvi_out_hstx_encoder
         dvi_out_hstx_encoder.c
+        atom_if.c
+        mc6847.c
         )
 
 pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
@@ -23,6 +25,7 @@ target_include_directories(dvi_out_hstx_encoder PRIVATE
 target_link_libraries(dvi_out_hstx_encoder
         pico_stdlib
         pico_multicore
+        hardware_pio
         hardware_dma
         pico_sync
         )
@@ -32,4 +35,5 @@ pico_add_extra_outputs(dvi_out_hstx_encoder)
 
 pico_enable_stdio_uart(dvi_out_hstx_encoder 1)
 pico_set_linker_script(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
+#pico_set_linker_script(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/memmap_copy_to_ram_pico2.ld)
 

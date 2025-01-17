@@ -1,3 +1,25 @@
+/*
+
+PIO/DMA interface to the 6502 bus
+
+Copyright 2021-2025 Chris Moulang
+
+This file is part of AtomHDMI
+
+AtomHDMI is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+AtomHDMI is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
+
+*/
+
 #include "atom_if.h"
 
 
@@ -53,7 +75,6 @@ static void eb2_address_program_init(PIO pio, uint sm, bool r65c02mode)
     pio_sm_set_consecutive_pindirs(pio, sm, PIN_MUX_DATA, 3, true);
     pio_sm_set_consecutive_pindirs(pio, sm, PIN_A0, 8, false);
 
-    sm_config_set_jmp_pin(&c, PIN_A0 + 7); // == A15
     sm_config_set_in_pins(&c, PIN_A0);
     sm_config_set_out_pins(&c, PIN_A0, 8);
     sm_config_set_set_pins(&c, PIN_A0, 8);
@@ -210,6 +231,9 @@ void eb_set_exclusive_handler(irq_handler_t handler)
     dma_channel_set_irq1_enabled(eb_event_chan, true);
 
     // Configure the processor to run dma_handler() when DMA IRQ 1 is asserted
+    dma_hw->ints1 = 1u << eb_event_chan;
+    dma_hw->inte1 = 1u << eb_event_chan;
+
     irq_set_exclusive_handler(DMA_IRQ_1, handler);
     irq_set_enabled(DMA_IRQ_1, true);
     irq_set_priority(DMA_IRQ_1, 0);

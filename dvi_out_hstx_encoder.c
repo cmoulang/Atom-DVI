@@ -17,6 +17,7 @@
 #include "hardware/structs/sio.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
+#include "mc6847.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -164,6 +165,8 @@ void scroll_framebuffer(void);
 void core1_func();
 
 int main(void) {
+    dma_claim_mask((1u << DMACH_PING) | (1u << DMACH_PONG));
+
     // Configure HSTX's TMDS encoder for RGB332
     hstx_ctrl_hw->expand_tmds =
         2  << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
@@ -263,19 +266,21 @@ int main(void) {
 
     dma_channel_start(DMACH_PING);
 
-    multicore_launch_core1(core1_func);
+
+    // multicore_launch_core1(core1_func);
+    core1_func();
 
     while (1) {
         __wfi();
     }
 }
 
+
 void core1_func() {
+    mc6847_init();
+    mc6847_run();
     while (1) {
-        for (int row = 0; row<480; row++) {
-            int row2 = (row + 1) % 480;
-            memcpy(&mountains_640x480[row*640], &mountains_640x480[row2*640], 640);
-        }
+        __wfi();
     }
 
 }
