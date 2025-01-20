@@ -27,6 +27,8 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 
 #include "atom_if.h"
 #include "hardware/sync.h"
+#include "fonts.h"
+#include "platform.h"
 
 #define FB_ADDR 0x8000
 #define VID_MEM_SIZE 0x2000
@@ -228,6 +230,7 @@ struct mc6847_context {
     uint8_t* pico_fb;
     unsigned int atom_fb;
     int mode;
+    uint16_t border_colour;
 };
 
 typedef struct mc6847_context mc6847_context_t;
@@ -257,7 +260,6 @@ static inline uint8_t* add_border(uint8_t* buffer, uint8_t color, int width) {
     memset(buffer, color, width);
     return buffer + width;
 }
-uint8_t border_color = 42;
 
 volatile uint8_t artifact = 0;
 
@@ -384,23 +386,143 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
     return p;
 }
 
+#define INV_MASK    0x80
+#define AS_MASK     0x40
+#define INTEXT_MASK AS_MASK
+
+#define GetIntExt(ch)   (ch & INTEXT_MASK) ? true : false
+
+volatile uint8_t fontno = DEFAULT_FONT;
+volatile uint16_t paper = DEF_PAPER;
+volatile uint16_t ink = DEF_INK;
+volatile uint16_t ink_alt = DEF_INK_ALT;
+volatile bool support_lower = false;
+volatile uint8_t max_lower = LOWER_END;
+
+
+// Always 0 on Atom
+#define GetSAMSG()      0
+
+uint8_t *do_text(mc6847_context_t* context, unsigned int relative_line_num, uint8_t *p, bool is_debug)
+{
+    // Screen is 16 rows x 32 columns
+    // Each char is 12 x 8 pixels
+    // Note we divide ralative_line_number by 2 as we are double scanning each 6847 line to
+    // 2 VGA lines.
+    uint row = (relative_line_num / 2) / 12;              // char row
+    uint sub_row = (relative_line_num / 2) % 12;          // scanline within current char row
+    uint sgidx = is_debug ? TEXT_INDEX : GetSAMSG();      // index into semigraphics table
+    uint rows_per_char = 12 / sg_bytes_row[sgidx];        // bytes per character space vertically
+    uint8_t *fontdata = fonts[fontno].fontdata + sub_row; // Local fontdata pointer
+
+    if (row < 16)
+    {
+        // Calc start address for this row
+        uint vdu_address = ((chars_per_row * sg_bytes_row[sgidx]) * row) + (chars_per_row * (sub_row / rows_per_char));
+
+        for (int col = 0; col < 32; col++)
+        {
+            // Get character data from RAM and extract inv,ag,int/ext
+            uint ch = eb_get(context->atom_fb + vdu_address + col);
+            bool inv = (ch & INV_MASK) ? true : false;
+            bool as = (ch & AS_MASK) ? true : false;
+            bool intext = GetIntExt(ch);
+
+            uint16_t fg_colour;
+            uint16_t bg_colour = paper;
+
+            // Deal with text mode first as we can decide this purely on the setting of the
+            // alpha/semi bit.
+            if (!as)
+            {
+                uint8_t b = fontdata[(ch & 0x3f) * 12];
+
+                fg_colour = alt_colour() ? ink_alt : ink;
+
+                if (support_lower && ch >= LOWER_START && ch <= max_lower)
+                {
+                    b = fontdata[((ch & 0x3f) + 64) * 12];
+
+                    if (LOWER_INVERT)
+                    {
+                        bg_colour = fg_colour;
+                        fg_colour = paper;
+                    }
+                }
+                else if (inv)
+                {
+                    bg_colour = fg_colour;
+                    fg_colour = paper;
+                }
+
+                if (b == 0)
+                {
+                    for (int i=0; i<16; i++) {
+                        *p++ = bg_colour;
+                    }
+                }
+                else
+                {
+                    // The internal character generator is only 6 bits wide, however external
+                    // character ROMS are 8 bits wide so we must handle them here
+                    for (uint8_t mask = 0x80; mask > 0; mask = mask >> 1)
+                    {
+                        uint8_t c = (b & mask) ? fg_colour : bg_colour;
+                        *p++ = c;
+                        *p++ = c;
+                    }
+                }
+            }
+            else // Semigraphics
+            {
+                uint colour_index;
+
+                if (as && intext)
+                {
+                    sgidx = SG6_INDEX; // SG6
+                }
+
+                colour_index = (SG6_INDEX == sgidx) ? (ch & SG6_COL_MASK) >> SG6_COL_SHIFT : (ch & SG4_COL_MASK) >> SG4_COL_SHIFT;
+
+                if (alt_colour() && (SG6_INDEX == sgidx))
+                {
+                    colour_index += 4;
+                }
+
+                fg_colour = colour_palette_atom[colour_index];
+
+                uint pix_row = (SG6_INDEX == sgidx) ? 2 - (sub_row / 4) : 1 - (sub_row / 6);
+
+                uint16_t pix0 = ((ch >> (pix_row * 2)) & 0x1) ? fg_colour : bg_colour;
+                uint16_t pix1 = ((ch >> (pix_row * 2)) & 0x2) ? fg_colour : bg_colour;
+                for (int i=0; i<8; i++) {
+                    *p++ = pix1;
+                }
+                for (int i=0; i<8; i++) {
+                    *p++ = pix0;
+                }
+            }
+        }
+    }
+    return p;
+}
+
 static inline void draw_line(int line_num, mc6847_context_t* context,
                              uint8_t* p) {
     int relative_line_num = line_num - vertical_offset;
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
         // Add top/bottom borders
-        add_border(p, border_color, vga_width);
+        add_border(p, context->border_colour, vga_width);
     } else if (!(context->mode & 1))  // Alphanumeric or Semigraphics
     {
-        // if (relative_line_num >= 0 && relative_line_num < (16 * 24)) {
-        //     p = do_text(buffer, relative_line_num, GetVidMemBase(), p,
-        //     false);
-        // }
+        p = add_border(p, context->border_colour, horizontal_offset);
+        p = do_text(context, relative_line_num, p, false);
+        add_border(p, context->border_colour, horizontal_offset);
     } else {
-        p = add_border(p, border_color, horizontal_offset);
+        p = add_border(p, context->border_colour, horizontal_offset);
         p = do_graphics(p, context, relative_line_num);
-        add_border(p, border_color, horizontal_offset);
+        add_border(p, context->border_colour, horizontal_offset);
     }
 }
 
@@ -410,9 +532,9 @@ void mc6847_run() {
     int frame_count = 0;
     while (1) {
         if (get_absolute_time() >= stats_timeout) {
-            stats_timeout = make_timeout_time_ms(1000);
             printf("FPS: %d\n", frame_count);
             frame_count = 0;
+            stats_timeout = make_timeout_time_ms(1000);
         }
         while (get_absolute_time() < timeout) {
             //__wfi();
@@ -420,6 +542,7 @@ void mc6847_run() {
         timeout = make_timeout_time_ms(0);
         _context.mode = get_mode();
         _context.atom_fb = _calc_fb_base();
+        _context.border_colour =  (_context.mode & 1) ? colour_palette[0] : 0;
         for (int r = 0; r < vga_height; r++) {
             draw_line(r, &_context, _context.pico_fb + r * vga_width);
         }
