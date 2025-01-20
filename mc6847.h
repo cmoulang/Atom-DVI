@@ -22,9 +22,7 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
-#define FB_ADDR 0x8000
-#define VID_MEM_SIZE 0x2000
 
-void mc6847_init();
+void mc6847_init(char* pico_fb);
 
 void mc6847_run();
