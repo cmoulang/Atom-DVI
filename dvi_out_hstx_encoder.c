@@ -21,9 +21,9 @@
 #include "mc6847.h"
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
-#include "mountains_640x480_rgb332.h"
-#define framebuf mountains_640x480
+static uint8_t framebuf[640*480]; 
 
 // ----------------------------------------------------------------------------
 // DVI constants
@@ -167,13 +167,15 @@ void core1_func();
 
 #define SYS_CLOCK 252000 
 #define HSTX_CLOCK 126000
+#define PLL_CLOCK 252000
 
 int main(void) {
-    // Set custom system clock speed
-    set_sys_clock_khz(SYS_CLOCK, false);
+    // Set custom clock speeds
+    set_sys_clock_khz(SYS_CLOCK, true);
+    bool ok = clock_configure(clk_hstx, 0, CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS, SYS_CLOCK, HSTX_CLOCK);
     stdio_uart_init();
+    multicore_launch_core1(core1_func);
 
-    clock_configure(clk_hstx, 0, CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS, SYS_CLOCK, HSTX_CLOCK);
 
     dma_claim_mask((1u << DMACH_PING) | (1u << DMACH_PONG));
 
@@ -276,7 +278,7 @@ int main(void) {
 
     dma_channel_start(DMACH_PING);
 
-    multicore_launch_core1(core1_func);
+    // multicore_launch_core1(core1_func);
 
     while (1) {
         absolute_time_t timeout = make_timeout_time_ms(1000);
@@ -289,7 +291,7 @@ int main(void) {
 
 
 void core1_func() {
-    mc6847_init(mountains_640x480);
+    mc6847_init(framebuf);
     while (1) {
         __wfi();
     }
