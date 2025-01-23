@@ -22,6 +22,9 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+typedef unsigned char pixel_t;
+typedef unsigned short pixel2_t;
+static const int pixel_bits = 8;
 
 void mc6847_init(char* pico_fb);
 

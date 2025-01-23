@@ -67,18 +67,18 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define AT_MAGENTA (AT_RED | AT_BLUE)
 
 #define NO_COLOURS (9 + INCLUDE_BRIGHT_ORANGE)
-uint16_t colour_palette_atom[NO_COLOURS] = {AT_GREEN,
-                                            AT_YELLOW,
-                                            AT_BLUE,
-                                            AT_RED,
-                                            AT_WHITE,
-                                            AT_CYAN,
-                                            AT_MAGENTA,
-                                            AT_ORANGE,
-                                            AT_BLACK
+pixel_t colour_palette_atom[NO_COLOURS] = {AT_GREEN,
+                                           AT_YELLOW,
+                                           AT_BLUE,
+                                           AT_RED,
+                                           AT_WHITE,
+                                           AT_CYAN,
+                                           AT_MAGENTA,
+                                           AT_ORANGE,
+                                           AT_BLACK
 #if INCLUDE_BRIGHT_ORANGE
-                                            ,
-                                            BRIGHT_ORANGE
+                                           ,
+                                           BRIGHT_ORANGE
 #endif
 };
 
@@ -107,26 +107,24 @@ uint16_t colour_palette_atom[NO_COLOURS] = {AT_GREEN,
 #define DEF_INK_ALT AT_ORANGE
 #endif
 
-typedef uint8_t pixel_t;
+pixel_t colour_palette_vga80[8] = {AT_BLACK, AT_BLUE,    AT_GREEN,  AT_CYAN,
+                                   AT_RED,   AT_MAGENTA, AT_YELLOW, AT_WHITE};
 
-uint16_t colour_palette_vga80[8] = {AT_BLACK, AT_BLUE,    AT_GREEN,  AT_CYAN,
-                                    AT_RED,   AT_MAGENTA, AT_YELLOW, AT_WHITE};
-
-uint16_t colour_palette_improved[4] = {
+pixel_t colour_palette_improved[4] = {
     AT_BLACK,
     AT_YELLOW,
     AT_GREEN,
     AT_MAGENTA,
 };
 
-uint16_t colour_palette_artifact1[4] = {
+pixel_t colour_palette_artifact1[4] = {
     AT_BLACK,
     AT_BLUE,
     AT_ORANGE,
     AT_WHITE,
 };
 
-uint16_t colour_palette_artifact2[4] = {
+pixel_t colour_palette_artifact2[4] = {
     AT_BLACK,
     AT_ORANGE,
     AT_BLUE,
@@ -155,7 +153,7 @@ const unsigned int sg_bytes_row[5] = {1, 4, 6, 12, 1};
 #define SG24_INDEX 3
 #define SG6_INDEX 4
 
-uint16_t* colour_palette = colour_palette_atom;
+pixel_t* colour_palette = colour_palette_atom;
 
 //                             0  1a   1   2a    2   3a    3   4a    4
 //                             0  1    2    3    4    5    6    7    8
@@ -246,7 +244,7 @@ void reset_vga80() {
     eb_set(COL80_STAT, 0x12);
 }
 
-static uint16_t vga80_lut[128 * 4];
+static pixel2_t vga80_lut[128 * 4];
 
 void initialize_vga80() {
     // Reset the VGA80 hardware
@@ -266,16 +264,13 @@ void initialize_vga80() {
     }
 }
 
-
 void mc6847_init(char* pico_fb) {
-    //measure_freqs();
+    measure_freqs();
 
     _context.pico_fb = pico_fb;
     _context.atom_fb = FB_ADDR;
     _context.mode = 0;
     _context.border_colour = 0;
-
-    initialize_vga80();
 
     memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
     eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
@@ -283,6 +278,7 @@ void mc6847_init(char* pico_fb) {
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
+    initialize_vga80();
 
     eb_init(pio1);
     eb_set_exclusive_handler(event_handler);
@@ -317,11 +313,11 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
 
     const uint pixel_count = get_width(context->mode);
 
-    uint16_t* palette = colour_palette;
+    pixel_t* palette = colour_palette;
     if (alt_colour()) {
         palette += 4;
     }
-    uint16_t* art_palette =
+    pixel_t* art_palette =
         (1 == artifact) ? colour_palette_artifact1 : colour_palette_artifact2;
 
     if (is_colour(context->mode)) {
@@ -436,20 +432,55 @@ volatile uint8_t max_lower = LOWER_END;
 // Always 0 on Atom
 #define GetSAMSG() 0
 
-uint8_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
-                 uint8_t* p, bool is_debug) {
+static inline void do_char(pixel_t* p, uint sub_row, char ch) {
+    const pixel2_t fg_colour = AT_ORANGE | AT_ORANGE << pixel_bits;
+    const pixel2_t bg_colour = AT_WHITE_1 | AT_WHITE_1 << pixel_bits;
+
+    pixel2_t* q = (pixel2_t*)p;
+
+    const uint8_t* fontdata =
+        fonts[fontno].fontdata + sub_row;  // Local fontdata pointer
+
+    uint8_t b = fontdata[(ch & 0x3f) * 12];
+
+    if (ch >= LOWER_START && ch <= max_lower) {
+        b = fontdata[((ch & 0x3f) + 64) * 12];
+    }
+
+    if (b == 0) {
+        for (int i = 0; i < 8; i++) {
+            *q++ = bg_colour;
+        }
+    } else {
+        for (uint8_t mask = 0x80; mask > 0; mask = mask >> 1) {
+            pixel2_t c = (b & mask) ? fg_colour : bg_colour;
+            *q++ = c;
+        }
+    }
+}
+
+static inline void do_string(pixel_t* p, uint sub_row, char* str) {
+    while (*str) {
+        do_char(p, sub_row, *str);
+        p += 16;
+        str += 1;
+    }
+}
+
+pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
+                 pixel_t* p, bool is_debug) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
     // Note we divide ralative_line_number by 2 as we are double scanning each
     // 6847 line to 2 VGA lines.
-    uint row = (relative_line_num / 2) / 12;  // char row
-    uint sub_row =
+    const uint row = (relative_line_num / 2) / 12;  // char row
+    const uint sub_row =
         (relative_line_num / 2) % 12;  // scanline within current char row
     uint sgidx =
         is_debug ? TEXT_INDEX : GetSAMSG();  // index into semigraphics table
-    uint rows_per_char =
+    const uint rows_per_char =
         12 / sg_bytes_row[sgidx];  // bytes per character space vertically
-    uint8_t* fontdata =
+    const uint8_t* fontdata =
         fonts[fontno].fontdata + sub_row;  // Local fontdata pointer
 
     if (row < 16) {
@@ -537,7 +568,7 @@ uint8_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
     return p;
 }
 
-uint8_t* do_text_vga80(uint relative_line_num, uint8_t* p) {
+uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
     // Screen is 80 columns by 40 rows
     // Each char is 12 x 8 pixels
     uint row = relative_line_num / 12;
@@ -560,7 +591,7 @@ uint8_t* do_text_vga80(uint relative_line_num, uint8_t* p) {
 
         // For efficiency, compute two pixels at a time using a lookup table
         // p is now on a word boundary due to the extra pixels above
-        uint16_t* q = (uint16_t*)p;
+        pixel2_t* q = (pixel2_t*)p;
 
         if (vga80_ctrl1 & 0x08) {
             // Attribute mode enabled, attributes follow the characters in the
@@ -574,11 +605,11 @@ uint8_t* do_text_vga80(uint relative_line_num, uint8_t* p) {
             for (int col = 0; col < 80; col++) {
                 uint ch = eb_get(char_addr++);
                 uint attr = eb_get(attr_addr++);
-                uint16_t* vp = vga80_lut + ((attr & 0x77) << 2);
+                pixel2_t* vp = vga80_lut + ((attr & 0x77) << 2);
                 if (attr & 0x80) {
                     // Semi Graphics
-                    uint32_t p1 = (ch & smask1) ? *(vp + 3) : *vp;
-                    uint32_t p0 = (ch & smask0) ? *(vp + 3) : *vp;
+                    pixel2_t p1 = (ch & smask1) ? *(vp + 3) : *vp;
+                    pixel2_t p0 = (ch & smask0) ? *(vp + 3) : *vp;
                     // Unroll the writing of the four pixel pairs
                     *q++ = p1;
                     *q++ = p1;
@@ -611,7 +642,7 @@ uint8_t* do_text_vga80(uint relative_line_num, uint8_t* p) {
             //   colour bits 2..0 of VGA80_CTRL2 (#BDE5) are the default
             //   background colour
             uint attr = ((vga80_ctrl2 & 7) << 4) | (vga80_ctrl1 & 7);
-            uint16_t* vp = vga80_lut + (attr << 2);
+            pixel2_t* vp = vga80_lut + (attr << 2);
             for (int col = 0; col < 80; col++) {
                 uint ch = eb_get(char_addr++);
                 bool inv = (ch & INV_MASK) ? true : false;
@@ -654,13 +685,27 @@ static inline void draw_line(int line_num, mc6847_context_t* context,
     }
 }
 
+static inline void ascii_to_atom(char* str) {
+    for (int i = 0; i < strlen(str); i++) {
+        char c = str[i] + 0x20;
+        if (c < 0x80) {
+            c = c ^ 0x60;
+        }
+        str[i] = c;
+    }
+}
+
+#define INFO_STRLEN 12
+
 void mc6847_run() {
     absolute_time_t timeout = make_timeout_time_ms(0);
     absolute_time_t stats_timeout = make_timeout_time_ms(1000);
     int frame_count = 0;
+    char str[INFO_STRLEN] = {0};
     while (1) {
         if (get_absolute_time() >= stats_timeout) {
-            printf("FPS: %d\n", frame_count);
+            snprintf(str, INFO_STRLEN, "fps:%d", frame_count);
+            ascii_to_atom(str);
             frame_count = 0;
             stats_timeout = make_timeout_time_ms(1000);
         }
@@ -675,11 +720,27 @@ void mc6847_run() {
         if (vga80) {
             for (int r = 0; r < vga_height; r++) {
                 do_text_vga80(r, _context.pico_fb + r * vga_width);
+                if (r < 24) {
+                    do_string(_context.pico_fb + (r + 1) * vga_width -
+                                  (16 * INFO_STRLEN),
+                              r / 2 % 12, str);
+                }
             }
 
         } else {
-            for (int r = 0; r < vga_height; r++) {
-                draw_line(r, &_context, _context.pico_fb + r * vga_width);
+            for (int r = 0; r < vga_height; r += 1) {
+                if (r & 1) {
+                    uint8_t* src = _context.pico_fb + (r-1) * vga_width;
+                    memcpy(src+vga_width, src, vga_width);
+                    
+                } else {
+                    draw_line(r, &_context, _context.pico_fb + r * vga_width);
+                    if (r < 24) {
+                        do_string(_context.pico_fb + (r + 1) * vga_width -
+                                      (16 * INFO_STRLEN),
+                                  r / 2 % 12, str);
+                    }
+                }
             }
         }
         frame_count++;
