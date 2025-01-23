@@ -169,21 +169,7 @@ void core1_func();
 #define SYS_CLOCK 126000
 #define HSTX_CLOCK 126000
 
-int main(void) {
-    // Set custom clock speeds
-    set_sys_clock_khz(SYS_CLOCK, true);
-    if (SYS_CLOCK != HSTX_CLOCK) {
-        bool ok = clock_configure(clk_hstx, 0,
-                                  CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS,
-                                  SYS_CLOCK, HSTX_CLOCK);
-        assert(ok);
-    }
-    stdio_uart_init();
-    printf("Atom DVI v0.0.1-beta\n");
-    multicore_launch_core1(core1_func);
-
-    dma_claim_mask((1u << DMACH_PING) | (1u << DMACH_PONG));
-
+int hstx_main(void) {
     // Configure HSTX's TMDS encoder for RGB332
     hstx_ctrl_hw->expand_tmds = 2 << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
                                 0 << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB |
@@ -271,21 +257,63 @@ int main(void) {
         BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
 
     dma_channel_start(DMACH_PING);
+}
 
-    // multicore_launch_core1(core1_func);
+static semaphore_t core1_initted;
 
-    while (1) {
-        absolute_time_t timeout = make_timeout_time_ms(1000);
-        while (get_absolute_time() < timeout) {
-        }
+#define PIN_NRST 22
 
-        mc6847_run();
+void reset_vga80(void);
+
+void nrst_callback(uint gpio, uint32_t events) {
+    if (events & GPIO_IRQ_EDGE_RISE) {
+        reset_vga80();
     }
 }
 
 void core1_func() {
+    gpio_init(PIN_NRST);
+    gpio_put(PIN_NRST, false);
+    gpio_set_dir(PIN_NRST, true);
+
     mc6847_init(framebuf);
+    sem_release(&core1_initted);
+
+    busy_wait_ms(10);
+    gpio_set_dir(PIN_NRST, false);
+    while (!gpio_get(PIN_NRST)) {
+    };
+
+    gpio_set_irq_enabled_with_callback(PIN_NRST, GPIO_IRQ_EDGE_RISE, true,
+                                       &nrst_callback);
+
     while (1) {
         __wfi();
     }
+}
+
+int main(void) {
+    // Set custom clock speeds
+    set_sys_clock_khz(SYS_CLOCK, true);
+    if (SYS_CLOCK != HSTX_CLOCK) {
+        bool ok = clock_configure(clk_hstx, 0,
+                                  CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS,
+                                  SYS_CLOCK, HSTX_CLOCK);
+        assert(ok);
+    }
+    stdio_uart_init();
+
+    printf("Atom DVI v0.0.1-beta\n");
+
+    // create a semaphore to be posted when initialisation is complete
+    sem_init(&core1_initted, 0, 1);
+
+    dma_claim_mask((1u << DMACH_PING) | (1u << DMACH_PONG));
+
+    multicore_launch_core1(core1_func);
+    sem_acquire_blocking(&core1_initted);
+
+    hstx_main();
+
+    mc6847_run();
 }
