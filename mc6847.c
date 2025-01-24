@@ -518,9 +518,22 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                 }
 
                 if (b == 0) {
-                    for (int i = 0; i < 16; i++) {
-                        *p++ = bg_colour;
-                    }
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
                 } else {
                     // The internal character generator is only 6 bits wide,
                     // however external character ROMS are 8 bits wide so we
@@ -709,9 +722,7 @@ void mc6847_run() {
             frame_count = 0;
             stats_timeout = make_timeout_time_ms(1000);
         }
-        while (get_absolute_time() < timeout) {
-            //__wfi();
-        }
+       
         timeout = make_timeout_time_ms(0);
         _context.mode = get_mode();
         _context.atom_fb = _calc_fb_base();
@@ -730,9 +741,9 @@ void mc6847_run() {
         } else {
             for (int r = 0; r < vga_height; r += 1) {
                 if (r & 1) {
-                    uint8_t* src = _context.pico_fb + (r-1) * vga_width;
-                    memcpy(src+vga_width, src, vga_width);
-                    
+                    uint8_t* src = _context.pico_fb + (r - 1) * vga_width;
+                    memcpy(src + vga_width, src, vga_width);
+
                 } else {
                     draw_line(r, &_context, _context.pico_fb + r * vga_width);
                     if (r < 24) {
