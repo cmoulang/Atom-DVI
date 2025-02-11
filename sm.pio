@@ -22,8 +22,8 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 
 // 6502 bus signals
 .define public PIN_A0 2         ; also A8 or D0 depending on mux settings
-.define public PIN_1MHZ 20
-.define public PIN_R_NW 21
+.define public PIN_1MHZ 11
+.define public PIN_R_NW 10
 
 // mux control pins
 .define public PIN_MUX_ADD_LOW 28
