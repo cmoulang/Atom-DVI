@@ -247,7 +247,6 @@ static semaphore_t core1_initted;
 void reset_vga80(void);
 
 void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
-//    printf("IRQ %d %x\n", gpio, events);
     gpio_acknowledge_irq(gpio, events);
 
     if (events & GPIO_IRQ_EDGE_RISE) {
