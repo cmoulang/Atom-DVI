@@ -80,7 +80,7 @@
 #define XSCALE 2
 #define YSCALE 2
 
-#define REQUIRED_SYS_CLK_KHZ 126000
+#define REQUIRED_SYS_CLK_KHZ 252000
 #define HSTX_CLK_KHZ 126000
 
 #else
