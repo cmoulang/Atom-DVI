@@ -232,6 +232,7 @@ int hstx_main(void) {
     dma_hw->inte0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler);
     irq_set_enabled(DMA_IRQ_0, true);
+    irq_set_priority(DMA_IRQ_0, 0);
 
     bus_ctrl_hw->priority =
         BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
@@ -246,6 +247,9 @@ static semaphore_t core1_initted;
 void reset_vga80(void);
 
 void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
+//    printf("IRQ %d %x\n", gpio, events);
+    gpio_acknowledge_irq(gpio, events);
+
     if (events & GPIO_IRQ_EDGE_RISE) {
         reset_vga80();
     }
