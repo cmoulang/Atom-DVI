@@ -14,8 +14,12 @@ add_executable(dvi_out_hstx_encoder
         mc6847.c
         )
 
-pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
+target_compile_definitions(dvi_out_hstx_encoder PRIVATE
+        # See videomode.h for MODE values
+        MODE=MODE_640x480_60
+)
 
+pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(dvi_out_hstx_encoder PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/images
@@ -35,5 +39,4 @@ pico_add_extra_outputs(dvi_out_hstx_encoder)
 
 pico_enable_stdio_uart(dvi_out_hstx_encoder 1)
 pico_set_linker_script(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
-#pico_set_linker_script(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/memmap_copy_to_ram_pico2.ld)
 
