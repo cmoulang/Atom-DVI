@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "videomode.h"
 #include "atom_if.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
@@ -23,8 +24,6 @@
 #include "mc6847.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
-
-static uint8_t framebuf[640 * 480];
 
 // ----------------------------------------------------------------------------
 // DVI constants
@@ -38,18 +37,6 @@ static uint8_t framebuf[640 * 480];
 #define SYNC_V0_H1 (TMDS_CTRL_01 | (TMDS_CTRL_00 << 10) | (TMDS_CTRL_00 << 20))
 #define SYNC_V1_H0 (TMDS_CTRL_10 | (TMDS_CTRL_00 << 10) | (TMDS_CTRL_00 << 20))
 #define SYNC_V1_H1 (TMDS_CTRL_11 | (TMDS_CTRL_00 << 10) | (TMDS_CTRL_00 << 20))
-
-#define MODE_H_SYNC_POLARITY 0
-#define MODE_H_FRONT_PORCH 16
-#define MODE_H_SYNC_WIDTH 96
-#define MODE_H_BACK_PORCH 48
-#define MODE_H_ACTIVE_PIXELS 640
-
-#define MODE_V_SYNC_POLARITY 0
-#define MODE_V_FRONT_PORCH 10
-#define MODE_V_SYNC_WIDTH 2
-#define MODE_V_BACK_PORCH 33
-#define MODE_V_ACTIVE_LINES 480
 
 #define MODE_H_TOTAL_PIXELS                                       \
     (MODE_H_FRONT_PORCH + MODE_H_SYNC_WIDTH + MODE_H_BACK_PORCH + \
@@ -137,10 +124,8 @@ void __scratch_x("") dma_irq_handler() {
         ch->transfer_count = count_of(vactive_line);
         vactive_cmdlist_posted = true;
     } else {
-        ch->read_addr =
-            (uintptr_t)&framebuf[(v_scanline -
-                                  (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES)) *
-                                 MODE_H_ACTIVE_PIXELS];
+        uint x = v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+        ch->read_addr = (uintptr_t)getLine(x);
         ch->transfer_count = MODE_H_ACTIVE_PIXELS / sizeof(uint32_t);
         vactive_cmdlist_posted = false;
     }
@@ -163,11 +148,6 @@ static __force_inline uint8_t colour_rgb332(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void scroll_framebuffer(void);
-
-void core1_func();
-
-#define SYS_CLOCK 126000
-#define HSTX_CLOCK 126000
 
 int hstx_main(void) {
     // Configure HSTX's TMDS encoder for RGB332
@@ -265,28 +245,31 @@ static semaphore_t core1_initted;
 
 void reset_vga80(void);
 
-void nrst_callback(uint gpio, uint32_t events) {
+void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
     if (events & GPIO_IRQ_EDGE_RISE) {
         reset_vga80();
     }
 }
 
 void core1_func() {
-    gpio_init(PIN_NRST);
+    mc6847_init();
+
+    // toggle the 6502 reset pin
     gpio_put(PIN_NRST, false);
     gpio_set_dir(PIN_NRST, true);
-
-    mc6847_init(framebuf);
-    sem_release(&core1_initted);
-
     busy_wait_ms(10);
     gpio_set_dir(PIN_NRST, false);
+    gpio_set_pulls(PIN_NRST, true, false);
+    busy_wait_ms(100);
     while (!gpio_get(PIN_NRST)) {
     };
 
+    // NRST interrupt handler on core1
     gpio_set_irq_enabled_with_callback(PIN_NRST, GPIO_IRQ_EDGE_RISE, true,
                                        &nrst_callback);
 
+    sem_release(&core1_initted);
+    mc6847_run();
     while (1) {
         __wfi();
     }
@@ -294,16 +277,20 @@ void core1_func() {
 
 int main(void) {
     // Set custom clock speeds
-    set_sys_clock_khz(SYS_CLOCK, true);
-    if (SYS_CLOCK != HSTX_CLOCK) {
+    if (SYS_CLK_KHZ != REQUIRED_SYS_CLK_KHZ) {
+        set_sys_clock_khz(REQUIRED_SYS_CLK_KHZ, true);
+    }
+    if (SYS_CLK_KHZ != HSTX_CLK_KHZ) {
         bool ok = clock_configure(clk_hstx, 0,
                                   CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS,
-                                  SYS_CLOCK, HSTX_CLOCK);
-        assert(ok);
+                                  REQUIRED_SYS_CLK_KHZ, HSTX_CLK_KHZ);
     }
+
+    gpio_init(PIN_NRST);
+
     stdio_uart_init();
 
-    printf("Atom DVI v0.0.1-beta\n");
+    printf("Atom DVI v0.0.2-beta\n");
 
     // create a semaphore to be posted when initialisation is complete
     sem_init(&core1_initted, 0, 1);
@@ -315,5 +302,8 @@ int main(void) {
 
     hstx_main();
 
-    mc6847_run();
+    // mc6847_run();
+    while (1) {
+        __wfi();
+    }
 }

@@ -28,7 +28,15 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #include "atom_if.h"
 #include "fonts.h"
 #include "hardware/sync.h"
+#include "pico/util/queue.h"
 #include "platform.h"
+#include "videomode.h"
+
+// define the number of lines in the line buffer
+#define LB_COUNT 4
+
+static queue_t event_queue;
+char linebuf[MODE_H_ACTIVE_PIXELS * LB_COUNT];
 
 #define FB_ADDR 0x8000
 #define VID_MEM_SIZE 0x2000
@@ -184,18 +192,15 @@ unsigned int bytes_per_row(unsigned int mode) {
 
 const uint chars_per_row = 32;
 
-const uint vga_width = 640;
-const uint vga_height = 480;
+const uint max_width = 256 * XSCALE;
+const uint max_height = 192 * YSCALE;
 
-const uint max_width = 512;
-const uint max_height = 384;
-
-const uint vertical_offset = (vga_height - max_height) / 2;
-const uint horizontal_offset = (vga_width - max_width) / 2;
+const uint vertical_offset = (MODE_V_ACTIVE_LINES - max_height) / 2;
+const uint horizontal_offset = (MODE_H_ACTIVE_PIXELS - max_width) / 2;
 
 void __no_inline_not_in_flash_func(event_handler)() {
-    static uint8_t lastpia = 0;
     dma_hw->ints1 = 1u << eb_get_event_chan();
+    return;
     int address = eb_get_event();
     while (address > 0) {
         uint16_t x = eb_6502_addr(address);
@@ -227,7 +232,6 @@ void measure_freqs(void) {
 }
 
 struct mc6847_context {
-    uint8_t* pico_fb;
     unsigned int atom_fb;
     int mode;
     uint16_t border_colour;
@@ -264,13 +268,16 @@ void initialize_vga80() {
     }
 }
 
-void mc6847_init(char* pico_fb) {
+void mc6847_init() {
+    printf("mc6847_init\n");
     measure_freqs();
 
-    _context.pico_fb = pico_fb;
     _context.atom_fb = FB_ADDR;
     _context.mode = 0;
     _context.border_colour = 0;
+
+//    queue_init(&event_queue, sizeof(int), LB_COUNT);
+    queue_init_with_spinlock(&event_queue, sizeof(int), LB_COUNT, 42);
 
     memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
     eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
@@ -287,8 +294,10 @@ void mc6847_init(char* pico_fb) {
 static inline int _calc_fb_base() { return FB_ADDR; }
 
 static inline uint8_t* add_border(uint8_t* buffer, uint8_t color, int width) {
-    memset(buffer, color, width);
-    return buffer + width;
+    for (int i = 0; i < width; i++) {
+        *buffer++ = color;
+    }
+    return buffer;
 }
 
 volatile uint8_t artifact = 0;
@@ -471,11 +480,9 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                  pixel_t* p, bool is_debug) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
-    // Note we divide ralative_line_number by 2 as we are double scanning each
-    // 6847 line to 2 VGA lines.
-    const uint row = (relative_line_num / 2) / 12;  // char row
+    const uint row = (relative_line_num) / 12;  // char row
     const uint sub_row =
-        (relative_line_num / 2) % 12;  // scanline within current char row
+        (relative_line_num) % 12;  // scanline within current char row
     uint sgidx =
         is_debug ? TEXT_INDEX : GetSAMSG();  // index into semigraphics table
     const uint rows_per_char =
@@ -526,6 +533,7 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                     *p++ = bg_colour;
                     *p++ = bg_colour;
                     *p++ = bg_colour;
+#if (XSCALE > 1)
                     *p++ = bg_colour;
                     *p++ = bg_colour;
                     *p++ = bg_colour;
@@ -534,6 +542,27 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                     *p++ = bg_colour;
                     *p++ = bg_colour;
                     *p++ = bg_colour;
+#endif
+#if (XSCALE > 2)
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+#endif
+#if (XSCALE > 3)
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+                    *p++ = bg_colour;
+#endif
                 } else {
                     // The internal character generator is only 6 bits wide,
                     // however external character ROMS are 8 bits wide so we
@@ -541,7 +570,15 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                     for (uint8_t mask = 0x80; mask > 0; mask = mask >> 1) {
                         uint8_t c = (b & mask) ? fg_colour : bg_colour;
                         *p++ = c;
+#if (XSCALE > 1)
                         *p++ = c;
+#endif
+#if (XSCALE > 2)
+                        *p++ = c;
+#endif
+#if (XSCALE > 3)
+                        *p++ = c;
+#endif
                     }
                 }
             } else  // Semigraphics
@@ -685,15 +722,16 @@ static inline void draw_line(int line_num, mc6847_context_t* context,
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
         // Add top/bottom borders
-        add_border(p, context->border_colour, vga_width);
+        add_border(p, context->border_colour, MODE_H_ACTIVE_PIXELS);
     } else if (!(context->mode & 1))  // Alphanumeric or Semigraphics
     {
-        p = add_border(p, context->border_colour, horizontal_offset);
-        p = do_text(context, relative_line_num, p, false);
-        add_border(p, context->border_colour, horizontal_offset);
+        // p = add_border(p, context->border_colour, horizontal_offset);
+        p += horizontal_offset;
+        do_text(context, relative_line_num / YSCALE, p, false);
+        // add_border(p, context->border_colour, horizontal_offset);
     } else {
         p = add_border(p, context->border_colour, horizontal_offset);
-        p = do_graphics(p, context, relative_line_num);
+        p = do_graphics(p, context, relative_line_num * 2 / YSCALE);
         add_border(p, context->border_colour, horizontal_offset);
     }
 }
@@ -710,7 +748,28 @@ static inline void ascii_to_atom(char* str) {
 
 #define INFO_STRLEN 12
 
+char* getLine(const int line_num) {
+    queue_try_add(&event_queue, &line_num);
+    int buf_index = line_num % LB_COUNT;
+    return &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+}
+
 void mc6847_run() {
+    while (1) {
+        int line_num;
+        queue_remove_blocking(&event_queue, &line_num);
+        line_num = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
+        int buf_index = line_num % LB_COUNT;
+        char* p = &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+        _context.mode = get_mode();
+        _context.atom_fb = _calc_fb_base();
+        _context.border_colour = (_context.mode & 1) ? colour_palette[0] : 0;
+        draw_line(line_num, &_context, p);
+    }
+}
+
+/**
+void mc6847_runold() {
     absolute_time_t timeout = make_timeout_time_ms(0);
     absolute_time_t stats_timeout = make_timeout_time_ms(1000);
     int frame_count = 0;
@@ -722,7 +781,7 @@ void mc6847_run() {
             frame_count = 0;
             stats_timeout = make_timeout_time_ms(1000);
         }
-       
+
         timeout = make_timeout_time_ms(0);
         _context.mode = get_mode();
         _context.atom_fb = _calc_fb_base();
@@ -730,9 +789,9 @@ void mc6847_run() {
         uint vga80 = eb_get(COL80_BASE) & COL80_ON;
         if (vga80) {
             for (int r = 0; r < vga_height; r++) {
-                do_text_vga80(r, _context.pico_fb + r * vga_width);
+                do_text_vga80(r, &framebuf[0] + r * vga_width);
                 if (r < 24) {
-                    do_string(_context.pico_fb + (r + 1) * vga_width -
+                    do_string(&framebuf[0] + (r + 1) * vga_width -
                                   (16 * INFO_STRLEN),
                               r / 2 % 12, str);
                 }
@@ -741,13 +800,13 @@ void mc6847_run() {
         } else {
             for (int r = 0; r < vga_height; r += 1) {
                 if (r & 1) {
-                    uint8_t* src = _context.pico_fb + (r - 1) * vga_width;
+                    uint8_t* src = &framebuf[0] + (r - 1) * vga_width;
                     memcpy(src + vga_width, src, vga_width);
 
                 } else {
-                    draw_line(r, &_context, _context.pico_fb + r * vga_width);
+                    draw_line(r, &_context, &framebuf[0] + r * vga_width);
                     if (r < 24) {
-                        do_string(_context.pico_fb + (r + 1) * vga_width -
+                        do_string(&framebuf[0] + (r + 1) * vga_width -
                                       (16 * INFO_STRLEN),
                                   r / 2 % 12, str);
                     }
@@ -757,3 +816,4 @@ void mc6847_run() {
         frame_count++;
     }
 }
+*/
