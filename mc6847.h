@@ -28,4 +28,4 @@ static const int pixel_bits = 8;
 
 void mc6847_init();
 void mc6847_run();
-char* getLine(int line_num);
+pixel_t* getLine(int line_num);

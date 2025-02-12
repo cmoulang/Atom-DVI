@@ -312,7 +312,46 @@ int get_mode() {
 #endif
 }
 
-static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
+static inline void write_pixel(pixel_t** pp, pixel_t c) {
+    pixel_t* p = *pp;
+    *p++ = c;
+#if (XSCALE > 1)
+    *p++ = c;
+#endif
+#if (XSCALE > 2)
+    *p++ = c;
+#endif
+#if (XSCALE > 3)
+    *p++ = c;
+#endif
+    *pp = p;
+}
+
+static inline void write_pixel8(pixel_t** pp, pixel_t c) {
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+}
+
+static inline void write_pixel4(pixel_t** pp, pixel_t c) {
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+}
+
+static inline void write_pixel2(pixel_t** pp, pixel_t c) {
+    write_pixel(pp, c);
+    write_pixel(pp, c);
+}
+
+
+static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
                                    int _relative_line_num) {
     const int height = get_height(context->mode);
     const int graphics_line_num = (_relative_line_num / 2) * height / 192;
@@ -339,19 +378,9 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
             uint x = (word >> 30) & 0b11;
             uint16_t colour = palette[x];
             if (pixel_count == 128) {
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
+                write_pixel2(&p, colour);
             } else if (pixel_count == 64) {
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
-                *p++ = colour;
+                write_pixel4(&p, colour);
             }
             word = word << 2;
         }
@@ -364,23 +393,19 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
                 if (0 == artifact) {
                     for (uint32_t mask = 0x80000000; mask > 0;) {
                         uint16_t colour = (b & mask) ? fg : 0;
-                        *p++ = colour;
-                        *p++ = colour;
+                        write_pixel(&p, colour);
                         mask = mask >> 1;
 
                         colour = (b & mask) ? fg : 0;
-                        *p++ = colour;
-                        *p++ = colour;
+                        write_pixel(&p, colour);
                         mask = mask >> 1;
 
                         colour = (b & mask) ? fg : 0;
-                        *p++ = colour;
-                        *p++ = colour;
+                        write_pixel(&p, colour);
                         mask = mask >> 1;
 
                         colour = (b & mask) ? fg : 0;
-                        *p++ = colour;
-                        *p++ = colour;
+                        write_pixel(&p, colour);
                         mask = mask >> 1;
                     }
                 } else {
@@ -389,10 +414,7 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
                         uint acol = (word >> 30) & 0b11;
                         uint16_t colour = art_palette[acol];
 
-                        *p++ = colour;
-                        *p++ = colour;
-                        *p++ = colour;
-                        *p++ = colour;
+                        write_pixel2(&p, colour);
 
                         word = word << 2;
                     }
@@ -402,22 +424,12 @@ static inline uint8_t* do_graphics(uint8_t* p, mc6847_context_t* context,
             else if (pixel_count == 128) {
                 for (uint32_t mask = 0x80000000; mask > 0; mask = mask >> 1) {
                     uint16_t colour = (b & mask) ? palette[0] : 0;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
+                    write_pixel2(&p, colour);
                 }
             } else if (pixel_count == 64) {
                 for (uint32_t mask = 0x80000000; mask > 0; mask = mask >> 1) {
                     uint16_t colour = (b & mask) ? palette[0] : 0;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
-                    *p++ = colour;
+                    write_pixel4(&p, colour);
                 }
             }
         }
@@ -525,60 +537,14 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                 }
 
                 if (b == 0) {
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-#if (XSCALE > 1)
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-#endif
-#if (XSCALE > 2)
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-#endif
-#if (XSCALE > 3)
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-                    *p++ = bg_colour;
-#endif
+                    write_pixel8(&p, bg_colour);
                 } else {
                     // The internal character generator is only 6 bits wide,
                     // however external character ROMS are 8 bits wide so we
                     // must handle them here
                     for (uint8_t mask = 0x80; mask > 0; mask = mask >> 1) {
                         uint8_t c = (b & mask) ? fg_colour : bg_colour;
-                        *p++ = c;
-#if (XSCALE > 1)
-                        *p++ = c;
-#endif
-#if (XSCALE > 2)
-                        *p++ = c;
-#endif
-#if (XSCALE > 3)
-                        *p++ = c;
-#endif
+                        write_pixel(&p, c);
                     }
                 }
             } else  // Semigraphics
@@ -748,7 +714,11 @@ static inline void ascii_to_atom(char* str) {
 
 #define INFO_STRLEN 12
 
-char* getLine(const int line_num) {
+/// @brief Called from the DMA IRQ routine.
+/// Get the pixels for the given line number and add the line number to the event queue.
+/// @param line_num the line number
+/// @return MODE_H_ACTIVE_PIXELS pixels
+pixel_t* getLine(const int line_num) {
     queue_try_add(&event_queue, &line_num);
     int buf_index = line_num % LB_COUNT;
     return &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
@@ -758,13 +728,13 @@ void mc6847_run() {
     while (1) {
         int line_num;
         queue_remove_blocking(&event_queue, &line_num);
-        line_num = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
-        int buf_index = line_num % LB_COUNT;
+        const int next = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
+        int buf_index = next % LB_COUNT;
         char* p = &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
         _context.mode = get_mode();
         _context.atom_fb = _calc_fb_base();
         _context.border_colour = (_context.mode & 1) ? colour_palette[0] : 0;
-        draw_line(line_num, &_context, p);
+        draw_line(next, &_context, p);
     }
 }
 
