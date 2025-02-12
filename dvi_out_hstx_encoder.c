@@ -268,8 +268,7 @@ void core1_func() {
     };
 
     // NRST interrupt handler on core1
-    gpio_set_irq_enabled_with_callback(PIN_NRST, GPIO_IRQ_EDGE_RISE, true,
-                                       &nrst_callback);
+    // gpio_set_irq_enabled_with_callback(PIN_NRST, GPIO_IRQ_EDGE_RISE, true, &nrst_callback);
 
     sem_release(&core1_initted);
     mc6847_run();
