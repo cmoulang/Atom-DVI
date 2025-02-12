@@ -276,8 +276,7 @@ void mc6847_init() {
     _context.mode = 0;
     _context.border_colour = 0;
 
-    //    queue_init(&event_queue, sizeof(int), LB_COUNT);
-    queue_init_with_spinlock(&event_queue, sizeof(int), LB_COUNT, 42);
+    queue_init(&event_queue, sizeof(int), LB_COUNT);
 
     memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
     eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
