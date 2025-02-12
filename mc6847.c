@@ -733,7 +733,11 @@ void mc6847_run() {
         _context.mode = get_mode();
         _context.atom_fb = _calc_fb_base();
         _context.border_colour = (_context.mode & 1) ? colour_palette[0] : 0;
-        draw_line(next, &_context, p);
+        if (eb_get(COL80_BASE) & COL80_ON) {
+            do_text_vga80(next, p);
+        } else {
+            draw_line(next, &_context, p);
+        }
     }
 }
 
