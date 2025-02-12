@@ -3,7 +3,6 @@
 #define MODE_800x600_60 1
 #define MODE_720x576_60 2
 #define MODE_640x480_60 3
-#define MODE_1920x1200_60 4
 
 // MODE is defined in CMakeLists.txt
 
@@ -45,25 +44,6 @@
 #define REQUIRED_SYS_CLK_KHZ 156000
 #define HSTX_CLK_KHZ 156000
 
-#elif (MODE == MODE_1920x1200_60)
-#define MODE_H_SYNC_POLARITY 1
-#define MODE_H_FRONT_PORCH 88
-#define MODE_H_SYNC_WIDTH 44
-#define MODE_H_BACK_PORCH 80
-#define MODE_H_ACTIVE_PIXELS 720
-
-#define MODE_V_SYNC_POLARITY 0
-#define MODE_V_FRONT_PORCH 3
-#define MODE_V_SYNC_WIDTH 7
-#define MODE_V_BACK_PORCH 7
-#define MODE_V_ACTIVE_LINES 576
-
-#define XSCALE 2
-#define YSCALE 2
-
-#define REQUIRED_SYS_CLK_KHZ 156000
-#define HSTX_CLK_KHZ 156000
-
 #elif (MODE == MODE_640x480_60)
 #define MODE_H_SYNC_POLARITY 0
 #define MODE_H_FRONT_PORCH 16
@@ -87,4 +67,3 @@
 #error "Bad MODE"
 
 #endif
-
