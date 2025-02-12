@@ -276,7 +276,7 @@ void mc6847_init() {
     _context.mode = 0;
     _context.border_colour = 0;
 
-//    queue_init(&event_queue, sizeof(int), LB_COUNT);
+    //    queue_init(&event_queue, sizeof(int), LB_COUNT);
     queue_init_with_spinlock(&event_queue, sizeof(int), LB_COUNT, 42);
 
     memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
@@ -313,18 +313,20 @@ int get_mode() {
 }
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
-    pixel_t* p = *pp;
-    *p++ = c;
+    **pp = c;
+    *pp += 1;
 #if (XSCALE > 1)
-    *p++ = c;
+    **pp = c;
+    *pp += 1;
 #endif
 #if (XSCALE > 2)
-    *p++ = c;
+    **pp = c;
+    *pp += 1;
 #endif
 #if (XSCALE > 3)
-    *p++ = c;
+    **pp = c;
+    *pp += 1;
 #endif
-    *pp = p;
 }
 
 static inline void write_pixel8(pixel_t** pp, pixel_t c) {
@@ -349,7 +351,6 @@ static inline void write_pixel2(pixel_t** pp, pixel_t c) {
     write_pixel(pp, c);
     write_pixel(pp, c);
 }
-
 
 static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
                                    int _relative_line_num) {
@@ -419,9 +420,7 @@ static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
                         word = word << 2;
                     }
                 }
-            }
-
-            else if (pixel_count == 128) {
+            } else if (pixel_count == 128) {
                 for (uint32_t mask = 0x80000000; mask > 0; mask = mask >> 1) {
                     uint16_t colour = (b & mask) ? palette[0] : 0;
                     write_pixel2(&p, colour);
@@ -715,7 +714,8 @@ static inline void ascii_to_atom(char* str) {
 #define INFO_STRLEN 12
 
 /// @brief Called from the DMA IRQ routine.
-/// Get the pixels for the given line number and add the line number to the event queue.
+/// Get the pixels for the given line number and add the line number to the
+/// event queue.
 /// @param line_num the line number
 /// @return MODE_H_ACTIVE_PIXELS pixels
 pixel_t* getLine(const int line_num) {
