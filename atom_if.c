@@ -227,6 +227,8 @@ void eb_shutdown()
 
 void eb_set_exclusive_handler(irq_handler_t handler)
 {
+    irq_set_exclusive_handler(DMA_IRQ_1, handler);
+
     // Tell the DMA to raise IRQ line 1 when the eb_event_chan finishes copying the address
     dma_channel_set_irq1_enabled(eb_event_chan, true);
 
@@ -234,7 +236,6 @@ void eb_set_exclusive_handler(irq_handler_t handler)
     dma_hw->ints1 = 1u << eb_event_chan;
     dma_hw->inte1 = 1u << eb_event_chan;
 
-    irq_set_exclusive_handler(DMA_IRQ_1, handler);
     irq_set_enabled(DMA_IRQ_1, true);
     irq_set_priority(DMA_IRQ_1, 0);
     dma_hw->ints1 = 1u << eb_event_chan;
