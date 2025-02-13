@@ -28,6 +28,7 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #include "atom_if.h"
 #include "fonts.h"
 #include "hardware/sync.h"
+#include "pico/time.h"
 #include "pico/util/queue.h"
 #include "platform.h"
 #include "videomode.h"
@@ -268,28 +269,6 @@ void initialize_vga80() {
     }
 }
 
-void mc6847_init() {
-    printf("mc6847_init\n");
-    measure_freqs();
-
-    _context.atom_fb = FB_ADDR;
-    _context.mode = 0;
-    _context.border_colour = 0;
-
-    queue_init(&event_queue, sizeof(int), LB_COUNT);
-
-    memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
-    eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
-    eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
-    eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
-    eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
-    eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
-    initialize_vga80();
-
-    eb_init(pio1);
-    eb_set_exclusive_handler(event_handler);
-}
-
 static inline int _calc_fb_base() { return FB_ADDR; }
 
 static inline uint8_t* add_border(uint8_t* buffer, uint8_t color, int width) {
@@ -301,7 +280,13 @@ static inline uint8_t* add_border(uint8_t* buffer, uint8_t color, int width) {
 
 volatile uint8_t artifact = 0;
 
-static inline bool alt_colour() { return false; }
+static inline bool alt_colour() {
+#if (PLATFORM == PLATFORM_ATOM)
+    return !!(eb_get(PIA_ADDR + 2) & 0x8);
+#elif (PLATFORM == PLATFORM_DRAGON)
+    return (eb_get(PIA_ADDR) & 0x08);
+#endif
+}
 
 int get_mode() {
 #if (PLATFORM == PLATFORM_ATOM)
@@ -719,24 +704,96 @@ static inline void ascii_to_atom(char* str) {
 /// @return MODE_H_ACTIVE_PIXELS pixels
 pixel_t* getLine(const int line_num) {
     queue_try_add(&event_queue, &line_num);
-    int buf_index = line_num % LB_COUNT;
-    return &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+    if (line_num >= 0) {
+        int buf_index = line_num % LB_COUNT;
+        return &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+    } else {
+        return NULL;
+    }
+}
+
+volatile absolute_time_t vsync_time = {0};
+
+void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
+    gpio_acknowledge_irq(gpio, events);
+
+    if (events & GPIO_IRQ_EDGE_RISE) {
+        reset_vga80();
+    }
+}
+
+void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
+    // gpio_acknowledge_irq(gpio, events);
+    if (gpio == PIN_NRST) {
+        reset_vga80();
+    } else if (gpio == PIN_VSYNC) {
+        vsync_time = get_absolute_time();
+    }
+}
+
+void mc6847_init() {
+    printf("mc6847_init\n");
+    measure_freqs();
+
+    gpio_init(PIN_VSYNC);
+    gpio_set_dir(PIN_VSYNC, false);
+    gpio_init(PIN_NRST);
+    gpio_put(PIN_NRST, false);
+
+    _context.atom_fb = FB_ADDR;
+    _context.mode = 0;
+    _context.border_colour = 0;
+
+    gpio_set_irq_callback(gpio_callback);
+    gpio_set_irq_enabled(PIN_VSYNC, GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled(PIN_NRST, GPIO_IRQ_EDGE_RISE, true);
+    irq_set_enabled(IO_IRQ_BANK0, true);
+
+    queue_init(&event_queue, sizeof(int), LB_COUNT);
+
+    memset((char*)&_eb_memory[0], 0, sizeof _eb_memory);
+    eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
+    eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
+    eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
+    eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
+    eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
+    initialize_vga80();
+
+    eb_init(pio1);
+    eb_set_exclusive_handler(event_handler);
+
+    // toggle the 6502 reset pin
+    gpio_set_dir(PIN_NRST, true);
+    busy_wait_ms(10);
+    gpio_set_dir(PIN_NRST, false);
 }
 
 void mc6847_run() {
+    int c = 0;
     while (1) {
         int line_num;
         queue_remove_blocking(&event_queue, &line_num);
-        const int next = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
-        int buf_index = next % LB_COUNT;
-        char* p = &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
-        _context.mode = get_mode();
-        _context.atom_fb = _calc_fb_base();
-        _context.border_colour = (_context.mode & 1) ? colour_palette[0] : 0;
-        if (eb_get(COL80_BASE) & COL80_ON) {
-            do_text_vga80(next, p);
+        if (line_num >= 0) {
+            const int next = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
+            int buf_index = next % LB_COUNT;
+            char* p = &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+            _context.mode = get_mode();
+            _context.atom_fb = _calc_fb_base();
+            _context.border_colour =
+                (_context.mode & 1) ? colour_palette[0] : 0;
+            if (eb_get(COL80_BASE) & COL80_ON) {
+                do_text_vga80(next, p);
+            } else {
+                draw_line(next, &_context, p);
+            }
         } else {
-            draw_line(next, &_context, p);
+            // -1 means local vsync
+            c++;
+            if (!(c % 60)) {
+                absolute_time_t t = get_absolute_time();
+                uint64_t x = absolute_time_diff_us(vsync_time, t);
+                printf("%lld\n", x);
+            }
         }
     }
 }

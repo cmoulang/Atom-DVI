@@ -26,6 +26,9 @@ typedef unsigned char pixel_t;
 typedef unsigned short pixel2_t;
 static const int pixel_bits = 8;
 
+#define PIN_NRST 22
+#define PIN_VSYNC 20
+
 void mc6847_init();
 void mc6847_run();
 pixel_t* getLine(int line_num);

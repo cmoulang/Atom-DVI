@@ -131,6 +131,12 @@ void __scratch_x("") dma_irq_handler() {
     }
 
     if (!vactive_cmdlist_posted) {
+        if (v_scanline == 1)
+        {
+            getLine(-1);
+        }
+    
+    
         v_scanline = (v_scanline + 1) % MODE_V_TOTAL_LINES;
     }
 }
@@ -242,37 +248,12 @@ int hstx_main(void) {
 
 static semaphore_t core1_initted;
 
-#define PIN_NRST 22
-
-void reset_vga80(void);
-
-void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
-    gpio_acknowledge_irq(gpio, events);
-
-    if (events & GPIO_IRQ_EDGE_RISE) {
-        reset_vga80();
-    }
-}
-
 void core1_func() {
     mc6847_init();
-
-    // toggle the 6502 reset pin
-    gpio_put(PIN_NRST, false);
-    gpio_set_dir(PIN_NRST, true);
-    busy_wait_ms(10);
-    gpio_set_dir(PIN_NRST, false);
-    gpio_set_pulls(PIN_NRST, true, false);
-    busy_wait_ms(100);
-    while (!gpio_get(PIN_NRST)) {
-    };
-
-    // NRST interrupt handler on core1
-    gpio_set_irq_enabled_with_callback(PIN_NRST, GPIO_IRQ_EDGE_RISE, true, &nrst_callback);
-
     sem_release(&core1_initted);
     mc6847_run();
     while (1) {
+        printf("Should not be here\n");
         __wfi();
     }
 }
@@ -288,8 +269,6 @@ int main(void) {
                                   REQUIRED_SYS_CLK_KHZ, HSTX_CLK_KHZ);
     }
 
-    gpio_init(PIN_NRST);
-
     stdio_uart_init();
 
     printf("Atom DVI v0.0.2-beta\n");
@@ -304,7 +283,7 @@ int main(void) {
 
     hstx_main();
 
-    // mc6847_run();
+    mc6847_run();
     while (1) {
         __wfi();
     }
