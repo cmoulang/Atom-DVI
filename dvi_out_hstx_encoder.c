@@ -174,13 +174,11 @@ void __scratch_x("") dma_irq_handler() {
         vactive_cmdlist_posted = false;
     }
 
+    if (v_scanline == MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH) {
+        getLine(-1);
+    }
+
     if (!vactive_cmdlist_posted) {
-        if (v_scanline == 1)
-        {
-            getLine(-1);
-        }
-    
-    
         v_scanline = (v_scanline + 1) % MODE_V_TOTAL_LINES;
     }
 }

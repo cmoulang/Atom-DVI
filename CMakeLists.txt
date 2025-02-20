@@ -34,11 +34,12 @@ add_executable(dvi_out_hstx_encoder
         dvi_out_hstx_encoder.c
         atom_if.c
         mc6847.c
+        teletext.c
         )
 
 target_compile_definitions(dvi_out_hstx_encoder PRIVATE
         # See videomode.h for MODE values
-        MODE=MODE_640x480_60
+        MODE=MODE_720x576_60
 )
 
 pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)

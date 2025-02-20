@@ -32,6 +32,8 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "pico/util/queue.h"
 #include "platform.h"
 #include "videomode.h"
+#include "colours.h"
+#include "teletext.h"
 
 // define the number of lines in the line buffer
 #define LB_COUNT 4
@@ -41,39 +43,6 @@ char linebuf[MODE_H_ACTIVE_PIXELS * LB_COUNT];
 
 #define FB_ADDR 0x8000
 #define VID_MEM_SIZE 0x2000
-
-// Option for two levels of orange: normal for semi-graphics and bright for text
-#ifndef INCLUDE_BRIGHT_ORANGE
-#define INCLUDE_BRIGHT_ORANGE 0
-#endif
-
-#define AT_RED_1 0b01100000
-#define AT_RED_2 0b10100000
-#define AT_RED 0b11100000
-
-#define AT_GREEN_1 0b00001100
-#define AT_GREEN_2 0b00010100
-#define AT_GREEN 0b00011100
-
-#define AT_BLUE_1 0b00000001
-#define AT_BLUE_2 0b00000010
-#define AT_BLUE 0b00000011
-
-#define AT_BLACK 0
-#define AT_YELLOW (AT_RED | AT_GREEN)
-#define AT_YELLOW_1 (AT_RED_1 | AT_GREEN_1)
-#define AT_WHITE (AT_RED | AT_GREEN | AT_BLUE)
-#define AT_WHITE_1 (AT_RED_1 | AT_GREEN_1 | AT_BLUE_1)
-#define AT_WHITE_2 (AT_WHITE_1 << 1)
-#define COLOUR AT_YELLOW
-#define AT_CYAN (AT_GREEN | AT_BLUE)
-#if INCLUDE_BRIGHT_ORANGE
-#define AT_ORANGE (AT_RED | AT_GREEN_1)
-#define BRIGHT_ORANGE (AT_RED | AT_GREEN_2)
-#else
-#define AT_ORANGE (AT_RED | AT_GREEN_2)
-#endif
-#define AT_MAGENTA (AT_RED | AT_BLUE)
 
 #define NO_COLOURS (9 + INCLUDE_BRIGHT_ORANGE)
 pixel_t colour_palette_atom[NO_COLOURS] = {AT_GREEN,
@@ -271,11 +240,14 @@ void initialize_vga80() {
 
 static inline int _calc_fb_base() { return FB_ADDR; }
 
-static inline uint8_t* add_border(uint8_t* buffer, uint8_t color, int width) {
-    for (int i = 0; i < width; i++) {
-        *buffer++ = color;
+static inline uint8_t* add_border(uint8_t* buffer, const uint8_t color,
+                                  const int width) {
+    const uint x = color | (color << 8) | (color << 16) | (color << 24);
+    uint* b = (uint*)buffer;
+    for (int i = 0; i < width / 4; i++) {
+        *b++ = x;
     }
-    return buffer;
+    return (uint8_t*)b;
 }
 
 volatile uint8_t artifact = 0;
@@ -733,6 +705,7 @@ void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 
 void mc6847_init() {
     printf("mc6847_init\n");
+    teletext_init();
     measure_freqs();
 
     gpio_init(PIN_VSYNC);
@@ -753,6 +726,7 @@ void mc6847_init() {
 
     eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
+    eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
@@ -768,6 +742,7 @@ void mc6847_init() {
 }
 
 void mc6847_run() {
+    uint64_t vsync_time_diff;
     int c = 0;
     while (1) {
         int line_num;
@@ -783,16 +758,13 @@ void mc6847_run() {
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-                draw_line(next, &_context, p);
+                do_teletext(next, p, false);
+                // draw_line(next, &_context, p);
             }
         } else {
             // -1 means local vsync
-            c++;
-            if (!(c % 60)) {
-                absolute_time_t t = get_absolute_time();
-                uint64_t x = absolute_time_diff_us(vsync_time, t);
-                printf("%lld\n", x);
-            }
+            absolute_time_t t = get_absolute_time();
+            vsync_time_diff = absolute_time_diff_us(vsync_time, t);
         }
     }
 }

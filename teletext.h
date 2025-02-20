@@ -1,6 +1,6 @@
 /*
 
-Convert Motorola 6847 VDU memory content to pico dvi frame buffer
+saa5050 teletext character generator emulation
 
 Copyright 2025 Chris Moulang
 
@@ -24,9 +24,10 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 #include "videomode.h"
 
-#define PIN_NRST 22
-#define PIN_VSYNC 20
+#define TELETEXT_LINES 500
+#define TELETEXT_ROW_HEIGHT 20
+#define TELETEXT_COLUMNS 40
+#define TELETEXT_H_PIXELS (TELETEXT_COLUMNS * 12)
 
-void mc6847_init();
-void mc6847_run();
-pixel_t* getLine(int line_num);
+pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug);
+void teletext_init(void);

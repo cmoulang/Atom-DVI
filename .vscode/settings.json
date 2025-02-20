@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "dma.h": "c",
-        "hstx_ctrl.h": "c"
+        "hstx_ctrl.h": "c",
+        "stdbool.h": "c"
     }
 }

@@ -90,3 +90,9 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #error "Bad MODE"
 
 #endif
+
+typedef unsigned char pixel_t;
+typedef unsigned short pixel2_t;
+static const int pixel_bits = 8;
+
+
