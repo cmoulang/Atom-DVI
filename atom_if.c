@@ -23,7 +23,7 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #include "atom_if.h"
 
 
-volatile uint16_t _Alignas(EB_BUFFER_LENGTH * 2) _eb_memory[EB_BUFFER_LENGTH] __attribute__((section(".uninitialized_dma_buffer"))) = {0};
+volatile uint16_t _Alignas(EB_BUFFER_LENGTH * 2) _eb_memory[EB_BUFFER_LENGTH] __attribute__((section(".uninitialized_dma_buffer")));
 
 #define EB_EVENT_QUEUE_BITS 7
 #define EB_EVENT_QUEUE_LEN ((1 << EB_EVENT_QUEUE_BITS) / __SIZEOF_INT__)
