@@ -158,8 +158,8 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
     if (relative_line_num == 0) {
         next_double = -1;
         // toggle the flash flag
-        frame_count = (frame_count + 1) % 48;
-        flash_now = frame_count < 16;
+        frame_count = (frame_count + 1) % 58;
+        flash_now = frame_count < 19;
     };
 
     int ch_index = 0x8400 + row * TELETEXT_COLUMNS;
