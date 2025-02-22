@@ -50,7 +50,11 @@ static inline int teletext_line_no(int line_num) {
 
 // the 20 lines in the 2x3 graphics are laid out as follows
 // 0 1 2 3 4 5 6 - 7 8 9 10 11 12 13 - 14 15 16 17 18 19
-static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated) {
+static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
+                                      bool second_double) {
+    if (second_double) {
+        return 0;
+    }
     uint16_t left, right;
     if (separated) {
         left = 0b0011110000000000;
@@ -100,17 +104,19 @@ static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
     }
 
     const uint16_t* fontdata;
-
-    if (double_height) {
-        if (second_double) {
+    if (second_double) {
+        if (double_height) {
             fontdata = font + sub_row / 2 + 10;  // + (10 - 19)
         } else {
-            fontdata = font + sub_row / 2;  // + (0..9)
+            return 0;
         }
     } else {
-        fontdata = font + sub_row;  // font + (0..19)
+        if (double_height) {
+            fontdata = font + sub_row / 2;  // + (0..9)
+        } else {
+            fontdata = font + sub_row;  // font + (0..19)
+        }
     }
-
     return fontdata[ch * FONT2_HEIGHT];
 }
 
@@ -209,14 +215,15 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
             if (graphics) {
                 if (ch >= 0x40 && ch < 0x60) {
                     bitmap = lookup_character(ch, sub_row, double_height,
-                                           next_double == row);
+                                              next_double == row);
                 } else {
-                    bitmap = lookup_graphic(ch, sub_row, separated_graphics);
+                    bitmap = lookup_graphic(ch, sub_row, separated_graphics,
+                                            next_double == row);
                     last_graph_bitmap = bitmap;
                 }
             } else {
                 bitmap = lookup_character(ch, sub_row, double_height,
-                                       next_double == row);
+                                          next_double == row);
             }
         }
 
