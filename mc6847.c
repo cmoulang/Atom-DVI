@@ -724,7 +724,9 @@ void mc6847_init() {
 
     queue_init(&event_queue, sizeof(int), LB_COUNT);
 
-    eb_set_perm(EB_ADDRESS_LOW, EB_PERM_NONE, EB_ADDRESS_HIGH - EB_ADDRESS_LOW);
+    for (int i=0; i<EB_BUFFER_LENGTH; i++) {
+        _eb_memory[i] = 0;
+    }
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
     eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
