@@ -130,7 +130,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
     bool box = false;
     bool separated_graphics = false;
     bool hold_graphics = false;
-    int last_graph = 0;
+    int last_graph_bitmap = 0;
 
     // Screen is 25 rows x 40 columns
     int relative_line_num = teletext_line_no(line_num);
@@ -165,7 +165,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
         switch (ch) {
             case 12:  // normal height
                 if (double_height) {
-                    last_graph = 0;
+                    last_graph_bitmap = 0;
                     double_height = false;
                 }
                 break;
@@ -187,7 +187,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
         }
 
         bool non_printing = ((ch & 0x7F) < 0x20);
-        uint16_t pix;
+        uint16_t bitmap;
         if (non_printing) {
             if (is_debug) {
                 int temp = ch & 0xF;
@@ -196,26 +196,26 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                 } else {
                     temp = temp + 'a' - 10;
                 }
-                pix = lookup_character(temp, sub_row, false, false);
+                bitmap = lookup_character(temp, sub_row, false, false);
             } else {
                 // non-printing char
                 if (hold_graphics) {
-                    pix = last_graph;
+                    bitmap = last_graph_bitmap;
                 } else {
-                    pix = 0;
+                    bitmap = 0;
                 }
             }
         } else {
             if (graphics) {
                 if (ch >= 0x40 && ch < 0x60) {
-                    pix = lookup_character(ch, sub_row, double_height,
+                    bitmap = lookup_character(ch, sub_row, double_height,
                                            next_double == row);
                 } else {
-                    pix = lookup_graphic(ch, sub_row, separated_graphics);
-                    last_graph = pix;
+                    bitmap = lookup_graphic(ch, sub_row, separated_graphics);
+                    last_graph_bitmap = bitmap;
                 }
             } else {
-                pix = lookup_character(ch, sub_row, double_height,
+                bitmap = lookup_character(ch, sub_row, double_height,
                                        next_double == row);
             }
         }
@@ -229,22 +229,21 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                 f = AT_ORANGE;
                 b = AT_BLACK;
             }
-            if (sub_row == 0 || sub_row == 19) {
-                pix = 0xFFFF;
+            if (sub_row >= 18) {
+                bitmap = 0x9999;
             }
-            pix = pix | 0x8010;
             for (uint16_t mask = 0x8000; mask >= 0x10; mask = mask >> 1) {
-                uint8_t c = (pix & mask) ? f : b;
+                uint8_t c = (bitmap & mask) ? f : b;
                 write_pixel(&p, c);
             }
         } else {
             if (flash_on && flash_now) {
                 // handle flashing
-                pix = 0;
+                bitmap = 0;
             }
 
             for (uint16_t mask = 0x8000; mask >= 0x10; mask = mask >> 1) {
-                uint8_t c = (pix & mask) ? fg_colour : bg_colour;
+                uint8_t c = (bitmap & mask) ? fg_colour : bg_colour;
                 write_pixel(&p, c);
             }
         }
@@ -254,7 +253,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
             case 1 ... 7:  // Alpha colour
                 fg_colour = colours[ch & 7];
                 if (graphics) {
-                    last_graph = 0;
+                    last_graph_bitmap = 0;
                     graphics = false;
                 }
                 break;
@@ -272,7 +271,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                 break;
             case 12:  // normal height
                 if (double_height) {
-                    last_graph = 0;
+                    last_graph_bitmap = 0;
                     double_height = false;
                 }
                 break;
@@ -281,14 +280,14 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                     next_double = row + 1;
                 }
                 if (!double_height) {
-                    last_graph = 0;
+                    last_graph_bitmap = 0;
                     double_height = true;
                 }
                 break;
             case 17 ... 23:  // graphics colour
                 fg_colour = colours[ch & 7];
                 if (!graphics) {
-                    last_graph = 0;
+                    last_graph_bitmap = 0;
                     graphics = true;
                 }
                 break;
