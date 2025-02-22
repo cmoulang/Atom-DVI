@@ -22,6 +22,8 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include <stdbool.h>
+
 #include "videomode.h"
 
 #define TELETEXT_LINES 500
