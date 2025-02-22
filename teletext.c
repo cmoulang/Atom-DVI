@@ -131,7 +131,8 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
     pixel_t bg_colour = AT_BLACK;
 
     bool graphics = false;
-    bool flash_on = false;
+    bool flash = false;
+    bool conceal = false;
     bool double_height = false;
     bool box = false;
     bool separated_graphics = false;
@@ -169,22 +170,31 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
 
         // pre-render
         switch (ch) {
-            case 12:  // normal height
+            case NORMAL_HEIGHT:
                 if (double_height) {
                     last_graph_bitmap = 0;
                     double_height = false;
                 }
                 break;
+            case DOUBLE_HEIGHT:
+                if (next_double != row) {
+                    next_double = row + 1;
+                }
+                if (!double_height) {
+                    last_graph_bitmap = 0;
+                    double_height = true;
+                }
+                break;
 
-            case 28:  // Black background
+            case BLACK_BACKGROUND:
                 bg_colour = AT_BLACK;
                 break;
 
-            case 29:  // New background colour
+            case NEW_BACKGROUND:
                 bg_colour = fg_colour;
                 break;
 
-            case 30:  // Hold graphics
+            case HOLD_GRAPHICS:
                 hold_graphics = true;
                 break;
 
@@ -244,8 +254,8 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                 write_pixel(&p, c);
             }
         } else {
-            if (flash_on && flash_now) {
-                // handle flashing
+            if (conceal || (flash && flash_now)) {
+                // handle conceal and flash
                 bitmap = 0;
             }
 
@@ -257,68 +267,46 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
 
         // post-render
         switch (ch) {
-            case 1 ... 7:  // Alpha colour
+            case ALPHA_RED ... ALPHA_WHITE:
                 fg_colour = colours[ch & 7];
                 if (graphics) {
                     last_graph_bitmap = 0;
                     graphics = false;
                 }
+                conceal = false;
                 break;
-            case 8:  // flash
-                flash_on = true;
+            case FLASH:
+                flash = true;
                 break;
-            case 9:  // steady
-                flash_on = false;
+            case STEADY:
+                flash = false;
                 break;
-            case 10:  // end_box
+            case END_BOX:
                 box = false;
                 break;
-            case 11:  // start_box
+            case START_BOX:
                 box = true;
                 break;
-            case 12:  // normal height
-                if (double_height) {
-                    last_graph_bitmap = 0;
-                    double_height = false;
-                }
-                break;
-            case 13:  // double height
-                if (next_double != row) {
-                    next_double = row + 1;
-                }
-                if (!double_height) {
-                    last_graph_bitmap = 0;
-                    double_height = true;
-                }
-                break;
-            case 17 ... 23:  // graphics colour
+            case GRAPHICS_RED ... GRAPHICS_WHITE:
                 fg_colour = colours[ch & 7];
                 if (!graphics) {
                     last_graph_bitmap = 0;
                     graphics = true;
                 }
+                conceal = false;
                 break;
-            case 24:  // Conceal display
+            case CONCEAL_DISPLAY:
+                conceal = true;
                 break;
-            case 25:  // Contiguous graphics
+            case CONTIGUOUS_GRAPHICS:
                 separated_graphics = false;
                 break;
-            case 26:  // Separated graphics
+            case SEPARATED_GRAPHICS:
                 separated_graphics = true;
                 break;
-            case 28:  // Black background
-                bg_colour = AT_BLACK;
-                break;
-            case 29:  // New background colour
-                bg_colour = fg_colour;
-                break;
-            case 30:  // Hold graphics
-                hold_graphics = true;
-                break;
-            case 31:  // Release graphics
+            case RELEASE_GRAPHICS:
                 hold_graphics = false;
                 break;
-
             default:
                 break;
         }

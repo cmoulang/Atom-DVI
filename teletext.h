@@ -26,6 +26,41 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 #include "videomode.h"
 
+enum  saa5050_ctrl {
+    _NUL = 0,
+    ALPHA_RED = 1,
+    ALPHA_GREEN = 2,
+    ALPHA_YELLOW = 3,
+    ALPHA_BLUE = 4,
+    ALPHA_MAGENTA = 5,
+    ALPHA_CYAN = 6,
+    ALPHA_WHITE = 7,
+    FLASH = 8,
+    STEADY = 9,
+    END_BOX = 10,
+    START_BOX = 11,
+    NORMAL_HEIGHT = 12,
+    DOUBLE_HEIGHT = 13,
+    _S0 = 14,
+    _S1 = 15,
+    _DLE = 16,
+    GRAPHICS_RED = 17,
+    GRAPHICS_GREEN = 18,
+    GRAPHICS_YELLOW = 19,
+    GRAPHICS_BLUE = 20,
+    GRAPHICS_MAGENTA = 21,
+    GRAPHICS_CYAN = 22,
+    GRAPHICS_WHITE = 23,
+    CONCEAL_DISPLAY = 24,
+    CONTIGUOUS_GRAPHICS = 25,
+    SEPARATED_GRAPHICS = 26,
+    _ESC = 27,
+    BLACK_BACKGROUND = 28,
+    NEW_BACKGROUND = 29,
+    HOLD_GRAPHICS = 30,
+    RELEASE_GRAPHICS = 31
+} ;
+
 #define TELETEXT_LINES 500
 #define TELETEXT_ROW_HEIGHT 20
 #define TELETEXT_COLUMNS 40
