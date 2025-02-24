@@ -180,7 +180,7 @@ static void eb_setup_dma(PIO pio, int eb2_address_sm,
 
     // Copies data from fifo to memory
     c = dma_channel_get_default_config(write_data_chan);
-    // channel_config_set_high_priority(&c, true);
+    channel_config_set_high_priority(&c, true);
     channel_config_set_dreq(&c, pio_get_dreq(pio, eb2_access_sm, false));
     channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
     channel_config_set_read_increment(&c, false);
@@ -228,6 +228,8 @@ void eb_shutdown()
 void eb_set_exclusive_handler(irq_handler_t handler)
 {
     irq_set_exclusive_handler(DMA_IRQ_1, handler);
+    irq_set_enabled(DMA_IRQ_1, true);
+    irq_set_priority(DMA_IRQ_1, PICO_DEFAULT_IRQ_PRIORITY/2);
 
     // Tell the DMA to raise IRQ line 1 when the eb_event_chan finishes copying the address
     dma_channel_set_irq1_enabled(eb_event_chan, true);
@@ -235,10 +237,6 @@ void eb_set_exclusive_handler(irq_handler_t handler)
     // Configure the processor to run dma_handler() when DMA IRQ 1 is asserted
     dma_hw->ints1 = 1u << eb_event_chan;
     dma_hw->inte1 = 1u << eb_event_chan;
-
-    irq_set_enabled(DMA_IRQ_1, true);
-    irq_set_priority(DMA_IRQ_1, 0);
-    dma_hw->ints1 = 1u << eb_event_chan;
 }
 
 int eb_get_event()
@@ -254,8 +252,6 @@ int eb_get_event()
     else
     {
         result = *out_ptr;
-        assert((uint)result >= (uint)&_eb_memory[0]);
-        assert((uint)result <= ((uint)&_eb_memory[0] + sizeof _eb_memory));
         out_ptr++;
         if (out_ptr > &eb_event_queue[EB_EVENT_QUEUE_LEN - 1])
         {

@@ -68,6 +68,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mc6847.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
+#include "atom_sid.h"
 
 // ----------------------------------------------------------------------------
 // DVI constants
@@ -291,16 +292,40 @@ int hstx_main(void) {
 static semaphore_t core1_initted;
 
 void core1_func() {
+    // run sid on this core
+    as_init();
     mc6847_init();
+
     sem_release(&core1_initted);
-    mc6847_run();
+
+    as_run();
+
     while (1) {
-        printf("Should not be here\n");
         __wfi();
     }
 }
 
+void beep()
+{
+    gpio_init(21);
+    gpio_set_dir(21, true);
+    gpio_set_drive_strength(21, GPIO_DRIVE_STRENGTH_12MA);
+    for (int i = 0; i < 50; i++)
+    {
+        sleep_ms(1);
+        gpio_put(21, 0);
+        sleep_ms(1);
+        gpio_put(21, 1);
+    }
+}
+
 int main(void) {
+    // initialise the shadow memory
+    for (int i=0; i<EB_BUFFER_LENGTH; i++) {
+        _eb_memory[i] = 0;
+    }
+
+    beep();
     // Set custom clock speeds
     if (SYS_CLK_KHZ != REQUIRED_SYS_CLK_KHZ) {
         set_sys_clock_khz(REQUIRED_SYS_CLK_KHZ, true);
@@ -313,7 +338,7 @@ int main(void) {
 
     stdio_uart_init();
 
-    printf("Atom DVI v0.0.2-beta\n");
+    printf("Atom DVI v0.0.3-beta\n");
 
     // create a semaphore to be posted when initialisation is complete
     sem_init(&core1_initted, 0, 1);

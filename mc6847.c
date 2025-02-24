@@ -34,9 +34,10 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "videomode.h"
 #include "colours.h"
 #include "teletext.h"
+#include "atom_sid.h"
 
 // define the number of lines in the line buffer
-#define LB_COUNT 4
+#define LB_COUNT 8
 
 static queue_t event_queue;
 char linebuf[MODE_H_ACTIVE_PIXELS * LB_COUNT];
@@ -167,16 +168,6 @@ const uint max_height = 192 * YSCALE;
 
 const uint vertical_offset = (MODE_V_ACTIVE_LINES - max_height) / 2;
 const uint horizontal_offset = (MODE_H_ACTIVE_PIXELS - max_width) / 2;
-
-void __no_inline_not_in_flash_func(event_handler)() {
-    dma_hw->ints1 = 1u << eb_get_event_chan();
-    return;
-    int address = eb_get_event();
-    while (address > 0) {
-        uint16_t x = eb_6502_addr(address);
-        address = eb_get_event();
-    }
-}
 
 void measure_freqs(void) {
     uint f_pll_sys =
@@ -698,6 +689,7 @@ void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
     // gpio_acknowledge_irq(gpio, events);
     if (gpio == PIN_NRST) {
         reset_vga80();
+        as_reset();
     } else if (gpio == PIN_VSYNC) {
         vsync_time = get_absolute_time();
     }
@@ -724,9 +716,6 @@ void mc6847_init() {
 
     queue_init(&event_queue, sizeof(int), LB_COUNT);
 
-    for (int i=0; i<EB_BUFFER_LENGTH; i++) {
-        _eb_memory[i] = 0;
-    }
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
     eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
@@ -735,7 +724,6 @@ void mc6847_init() {
     initialize_vga80();
 
     eb_init(pio1);
-    eb_set_exclusive_handler(event_handler);
 
     // toggle the 6502 reset pin
     gpio_set_dir(PIN_NRST, true);
@@ -743,6 +731,8 @@ void mc6847_init() {
     gpio_set_dir(PIN_NRST, false);
 }
 
+// run the emulation - this function can be run from both cores simultaneously
+// if necessary to increase performance
 void mc6847_run() {
     uint64_t vsync_time_diff;
     int c = 0;
@@ -760,8 +750,8 @@ void mc6847_run() {
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-                do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
-                // draw_line(next, &_context, p);
+                //do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
+                draw_line(next, &_context, p);
             }
         } else {
             // -1 means local vsync
@@ -770,53 +760,3 @@ void mc6847_run() {
         }
     }
 }
-
-/**
-void mc6847_runold() {
-    absolute_time_t timeout = make_timeout_time_ms(0);
-    absolute_time_t stats_timeout = make_timeout_time_ms(1000);
-    int frame_count = 0;
-    char str[INFO_STRLEN] = {0};
-    while (1) {
-        if (get_absolute_time() >= stats_timeout) {
-            snprintf(str, INFO_STRLEN, "fps:%d", frame_count);
-            ascii_to_atom(str);
-            frame_count = 0;
-            stats_timeout = make_timeout_time_ms(1000);
-        }
-
-        timeout = make_timeout_time_ms(0);
-        _context.mode = get_mode();
-        _context.atom_fb = _calc_fb_base();
-        _context.border_colour = (_context.mode & 1) ? colour_palette[0] : 0;
-        uint vga80 = eb_get(COL80_BASE) & COL80_ON;
-        if (vga80) {
-            for (int r = 0; r < vga_height; r++) {
-                do_text_vga80(r, &framebuf[0] + r * vga_width);
-                if (r < 24) {
-                    do_string(&framebuf[0] + (r + 1) * vga_width -
-                                  (16 * INFO_STRLEN),
-                              r / 2 % 12, str);
-                }
-            }
-
-        } else {
-            for (int r = 0; r < vga_height; r += 1) {
-                if (r & 1) {
-                    uint8_t* src = &framebuf[0] + (r - 1) * vga_width;
-                    memcpy(src + vga_width, src, vga_width);
-
-                } else {
-                    draw_line(r, &_context, &framebuf[0] + r * vga_width);
-                    if (r < 24) {
-                        do_string(&framebuf[0] + (r + 1) * vga_width -
-                                      (16 * INFO_STRLEN),
-                                  r / 2 % 12, str);
-                    }
-                }
-            }
-        }
-        frame_count++;
-    }
-}
-*/

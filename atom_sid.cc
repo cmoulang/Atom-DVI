@@ -28,19 +28,17 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 
 #define C64_CLOCK 1000000
-#define AS_TICK_US 24
+#define AS_TICK_US 32
 #define AS_SAMPLE_RATE 1000000 / AS_TICK_US
 #define AS_PIN 21
 #define AS_PWM_BITS 11
 #define AS_PWM_WRAP (1 << AS_PWM_BITS)
 
-static volatile int max_queue = 0;
 int as_count = 0;
 
 extern "C" void as_show_status()
 {
     //    printf("%d %d\n", in_count, out_count);
-    printf("max_queue=%d count=%d\n", max_queue, as_count);
     for (int i = 0; i < SID_LEN; i++)
     {
         printf("%02x ", eb_get(SID_BASE_ADDR + i));
@@ -50,7 +48,6 @@ extern "C" void as_show_status()
         }
     }
     puts("");
-    max_queue = 0;
 }
 
 SID *sid16 = NULL;
@@ -73,9 +70,8 @@ static void init_dac()
     pwm_set_enabled(audio_pin_slice, true);
 }
 
-void __no_inline_not_in_flash_func(event_handler)() {
-    dma_hw->ints1 = 1u << eb_get_event_chan();
-    return;
+extern "C" void __no_inline_not_in_flash_func(sid_event_handler)() {
+    dma_hw->intr = 1u << eb_get_event_chan();
     int address = eb_get_event();
     while (address > 0) {
         if (address >= eb_pico_addr(SID_BASE_ADDR) && address < eb_pico_addr(SID_BASE_ADDR + SID_WRITEABLE))
@@ -85,7 +81,6 @@ void __no_inline_not_in_flash_func(event_handler)() {
         address = eb_get_event();
     }
 }
-
 
 extern "C" void as_init()
 {
@@ -120,8 +115,6 @@ extern "C" void as_init()
     eb_set_perm(SID_BASE_ADDR + SID_WRITEABLE, EB_PERM_READ_ONLY, 4);
     as_update_reg(0x19, 0xFF);
     as_update_reg(0x1A, 0xFF);
-
-    eb_set_exclusive_handler(event_handler);
 }
 
 #ifdef DEBUG_SID_DATA
@@ -132,16 +125,10 @@ uint16_t debug_buf[500];
 static inline void do_sample()
 {
     // Output current sample
-    int sz = queue_get_level(&as_q);
-    if (sz > max_queue)
-    {
-        max_queue = sz;
-    }
     int sample = sid16->output(AS_PWM_BITS);
     sample = sample + (1 << (AS_PWM_BITS - 1));
     pwm_set_gpio_level(AS_PIN, sample);
     as_element_t el;
-    int ticks = AS_TICK_US;
     while (queue_try_remove(&as_q, &el))
     {
         if (el.address == 0)
@@ -157,11 +144,9 @@ static inline void do_sample()
             uint8_t reg = eb_6502_addr(el.address) & 0x1F;
 
             sid16->write(reg, data);
-            sid16->clock();
-            ticks--;
         }
     }
-    sid16->clock(ticks);
+    sid16->clock(AS_TICK_US);
     // Update the read-only SID regs
     as_update_reg(0x1B, sid16->read(0x1B));
     as_update_reg(0x1C, sid16->read(0x1C));
@@ -173,10 +158,15 @@ static bool as_timer_callback(repeating_timer_t *)
     return true;
 }
 
-static struct repeating_timer as_timer;
+repeating_timer_t as_timer;
+
+#define SID_POLL_LOOP 1
 
 extern "C" void as_run()
 {
+    printf("as_run()\n");
+    eb_set_exclusive_handler(sid_event_handler);
+
 #ifdef SID_POLL_LOOP
     uint32_t last_time = 0;
     for (;;)
@@ -186,7 +176,7 @@ extern "C" void as_run()
         {
             cur_time = time_us_32();
         }
-        do_sample();
+        do_sample(); 
     }
 #else
     bool ok = add_repeating_timer_us(-(int64_t)AS_TICK_US, as_timer_callback, NULL, &as_timer);

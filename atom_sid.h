@@ -52,7 +52,7 @@ extern "C"
         as_element_t el;
         el.address = 0;
         el.data = 0;
-        queue_add_blocking(&as_q, &el);
+        queue_try_add(&as_q, &el);
     }
 
     void as_run();

@@ -81,17 +81,15 @@ static inline void print_perm_range()
 /// @brief set the read/write permissions for an address
 /// @param address 6502 address
 /// @param  perm see enum for possible values
-static inline void eb_set_perm_byte(uint16_t address, enum eb_perm perm)
-{
-    if (perm != EB_PERM_NONE)
-    {
-        if (address > perm_high)
-            perm_high = address;
-        if (address < perm_low)
-            perm_low = address;
+static inline void eb_set_perm_byte(uint16_t address, enum eb_perm perm) {
+    if (perm != EB_PERM_NONE) {
+        if (address > perm_high) perm_high = address;
+        if (address < perm_low) perm_low = address;
     }
-        volatile uint8_t *p = (uint8_t *)&_eb_memory[address] + 1;
-        *p = perm;
+
+    volatile uint8_t *p = (uint8_t *)&_eb_memory[address] + 1;
+    hard_assert(*p == EB_PERM_NONE);
+    *p = perm;
 }
 
 /// @brief set the read/write permissions for a range of addresses

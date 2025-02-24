@@ -35,11 +35,28 @@ add_executable(dvi_out_hstx_encoder
         atom_if.c
         mc6847.c
         teletext.c
+        atom_sid.cc
+        resid-0.16/envelope.cc
+        resid-0.16/extfilt.cc
+        resid-0.16/pot.cc
+        resid-0.16/filter.cc
+        resid-0.16/sid.cc
+        resid-0.16/voice.cc
+        resid-0.16/wave.cc
+        resid-0.16/wave6581__ST.cc
+        resid-0.16/wave6581_P_T.cc
+        resid-0.16/wave6581_PS_.cc
+        resid-0.16/wave6581_PST.cc
+        resid-0.16/wave8580__ST.cc
+        resid-0.16/wave8580_P_T.cc
+        resid-0.16/wave8580_PS_.cc
+        resid-0.16/wave8580_PST.cc      
         )
 
 target_compile_definitions(dvi_out_hstx_encoder PRIVATE
         # See videomode.h for MODE values
-        MODE=MODE_720x576_60
+        # MODE=MODE_720x576_60
+        MODE=MODE_640x480_60_FAST
 )
 
 pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
@@ -54,6 +71,7 @@ target_link_libraries(dvi_out_hstx_encoder
         pico_multicore
         hardware_pio
         hardware_dma
+        hardware_pwm
         pico_sync
         )
 
