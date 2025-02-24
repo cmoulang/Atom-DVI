@@ -70,5 +70,5 @@ enum  saa5050_ctrl {
 #define TELETEXT_REG_BASE (TELETEXT_PAGE_BUFFER + TELETEXT_COLUMNS * TELETEXT_ROWS)
 #define TELETEXT_REG_FLAGS (TELETEXT_REG_BASE + 8)
 
-pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug);
+pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags);
 void teletext_init(void);

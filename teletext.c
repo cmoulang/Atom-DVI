@@ -117,7 +117,7 @@ static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
     return fontdata[ch * FONT2_HEIGHT];
 }
 
-pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
+pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     static int next_double = -1;
     static int frame_count = 0;
     static bool flash_now = false;
@@ -127,6 +127,8 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
     pixel_t fg_colour = AT_WHITE;
     pixel_t bg_colour = AT_BLACK;
 
+    bool is_debug = flags & 0x01;
+    bool reveal = flags & 0x02;
     bool graphics = false;
     bool flash = false;
     bool conceal = false;
@@ -251,7 +253,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
                 write_pixel(&p, c);
             }
         } else {
-            if (conceal || (flash && flash_now)) {
+            if ((conceal && !reveal) || (flash && flash_now)) {
                 // handle conceal and flash
                 bitmap = 0;
             }
