@@ -49,7 +49,8 @@ static inline int teletext_line_no(int line_num) {
 }
 
 // the 20 lines in the 2x3 graphics are laid out as follows
-// 0 1 2 3 4 5 6 - 7 8 9 10 11 12 13 - 14 15 16 17 18 19
+//   0  1  2  3  4  5                         14 15 16 17 18 19
+//                     6  7  8  9 10 11 12 13
 static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
                                       bool second_double) {
     if (second_double) {
@@ -57,10 +58,11 @@ static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
     }
     uint16_t left, right;
     if (separated) {
-        left = 0b0011110000000000;
-        right = 0b0000000011110000;
-        if (sub_row == 5 || sub_row == 6 || sub_row == 12 || sub_row == 13 ||
-            sub_row == 18 || sub_row == 19) {
+        left =  0b0111100000000000;
+        right = 0b0000000111100000;
+        if (sub_row == 5 || sub_row == 6 || 
+            sub_row == 13 || sub_row == 14||
+            sub_row == 0 || sub_row == 19) {
             return 0;
         }
     } else {
@@ -68,7 +70,7 @@ static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
         right = 0b0000001111110000;
     }
     uint16_t retval = 0;
-    if (sub_row < 7) {
+    if (sub_row < 6) {
         if (c & 0x01) {
             retval = left;
         };
