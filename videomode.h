@@ -86,6 +86,25 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define REQUIRED_SYS_CLK_KHZ 126000
 #define HSTX_CLK_KHZ 126000
 
+#elif (MODE == MODE_640x480_60_FAST)
+#define MODE_H_SYNC_POLARITY 0
+#define MODE_H_FRONT_PORCH 16
+#define MODE_H_SYNC_WIDTH 96
+#define MODE_H_BACK_PORCH 48
+#define MODE_H_ACTIVE_PIXELS 640
+
+#define MODE_V_SYNC_POLARITY 0
+#define MODE_V_FRONT_PORCH 10
+#define MODE_V_SYNC_WIDTH 2
+#define MODE_V_BACK_PORCH 33
+#define MODE_V_ACTIVE_LINES 480
+
+#define XSCALE 2
+#define YSCALE 2
+
+#define REQUIRED_SYS_CLK_KHZ 252000
+#define HSTX_CLK_KHZ 126000
+
 #else
 #error "Bad MODE"
 
