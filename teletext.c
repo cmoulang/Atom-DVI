@@ -32,7 +32,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #define FONT_HEIGHT 12
 #define FONT2_HEIGHT 20
 
-extern uint8_t fontdata_saa5050[];
+extern uint8_t fontdata_saa5050_b[];
 static uint16_t font[FONT_CHARS * FONT2_HEIGHT];
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
@@ -96,12 +96,7 @@ static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
 static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
                                         bool double_height,
                                         bool second_double) {
-    ch = ch & 0x7F;
-    if ((ch & 0b1100000) == 0b1000000) {
-        ch = ch ^ 0b1000000;
-    } else if ((ch & 0b1100000) == 0b1100000) {
-        ch = ch ^ 0b100000;
-    }
+    ch = (ch & 0x7F) - 0x20;
 
     const uint16_t* fontdata;
     if (second_double) {
@@ -382,23 +377,45 @@ void init_font() {
     uint16_t* dest_ptr = font;
     // convert 12x8 font to 20x16
     for (int ch = 0; ch < 0x60; ch += 1) {
-        uint8_t* src = fontdata_saa5050 + ch * 12;
+        uint8_t* src = fontdata_saa5050_b + ch * 12;
         dest_ptr = convert_char(dest_ptr, src);
     }
 }
 
+void print_pixels(uint16_t p) {
+    for (uint16_t m = 0x8000; m > 0; m = m >> 1) {
+        if (m & p) {
+            putchar('#');
+        } else {
+            putchar(' ');
+        }
+    }
+}
+
+
+void print_font() {
+    for (int r = 0; r < 16; r++) {
+        for (int col = 0; col < 6; col++) {
+            int c = col * 16 + r;
+            printf("// --- %2x ---   ", c);
+        }
+        putchar('\n');
+
+        for (int i = 0; i < FONT2_HEIGHT; i++) {
+            for (int col = 0; col < 6; col++) {
+                int c = col * 16 + r;
+                print_pixels(font[c * FONT2_HEIGHT + i]);
+            }
+            putchar('\n');
+
+        }
+        putchar('\n');
+    }
+    putchar('\n');
+}
+
+
 void teletext_init(void) {
     init_font();
-    // for (int ch = 0; ch < 0x60; ch += 1) {
-    //     printf("%x\n", ch);
-    //     for (int r = 0; r < 20; r++) {
-    //         putchar('|');
-    //         uint16_t pix = font[ch * FONT2_HEIGHT + r];
-    //         for (uint16_t mask = 0x8000; mask > 0; mask = mask >> 1) {
-    //             putchar(pix & mask ? 'X' : '.');
-    //         }
-    //         putchar('|');
-    //         putchar('\n');
-    //     }
-    // }
+    print_font();
 }
