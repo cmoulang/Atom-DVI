@@ -158,7 +158,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug) {
         flash_now = frame_count < 19;
     };
 
-    int ch_index = 0x8400 + row * TELETEXT_COLUMNS;
+    int ch_index = TELETEXT_PAGE_BUFFER + row * TELETEXT_COLUMNS;
 
     for (int col = 0; col < TELETEXT_COLUMNS; col++) {
         int ch = eb_get(ch_index++) & 0x7F;

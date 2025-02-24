@@ -64,7 +64,11 @@ enum  saa5050_ctrl {
 #define TELETEXT_LINES 500
 #define TELETEXT_ROW_HEIGHT 20
 #define TELETEXT_COLUMNS 40
+#define TELETEXT_ROWS 25
 #define TELETEXT_H_PIXELS (TELETEXT_COLUMNS * 12)
+#define TELETEXT_PAGE_BUFFER 0x9800
+#define TELETEXT_REG_BASE (TELETEXT_PAGE_BUFFER + TELETEXT_COLUMNS * TELETEXT_ROWS)
+#define TELETEXT_REG_FLAGS (TELETEXT_REG_BASE + 8)
 
 pixel_t* do_teletext(unsigned int line_num, pixel_t* p, bool is_debug);
 void teletext_init(void);

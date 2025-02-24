@@ -760,7 +760,7 @@ void mc6847_run() {
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-                do_teletext(next, p, eb_get(0x8800)!=0);
+                do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
                 // draw_line(next, &_context, p);
             }
         } else {
