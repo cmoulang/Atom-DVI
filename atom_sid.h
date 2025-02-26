@@ -30,6 +30,7 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #define SID_WRITEABLE 25
 #define SID_LEN 29
 #define AS_Q_LENGTH 32
+#define AS_PIN 21
 
 #ifdef __cplusplus
 extern "C"
@@ -55,8 +56,13 @@ extern "C"
         queue_try_add(&as_q, &el);
     }
 
+    /// @brief run the SID - never returns
     void as_run();
 
+    /// @brief run the SID using a timer
+    void as_run_async();
+    
+    /// @brief debug printf
     void as_show_status();
 
     static inline void as_update_reg(uint8_t reg, uint8_t data)

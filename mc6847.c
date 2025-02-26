@@ -26,15 +26,15 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include <stdint.h>
 
 #include "atom_if.h"
+#include "atom_sid.h"
+#include "colours.h"
 #include "fonts.h"
 #include "hardware/sync.h"
 #include "pico/time.h"
 #include "pico/util/queue.h"
 #include "platform.h"
-#include "videomode.h"
-#include "colours.h"
 #include "teletext.h"
-#include "atom_sid.h"
+#include "videomode.h"
 
 // define the number of lines in the line buffer
 #define LB_COUNT 8
@@ -168,29 +168,6 @@ const uint max_height = 192 * YSCALE;
 
 const uint vertical_offset = (MODE_V_ACTIVE_LINES - max_height) / 2;
 const uint horizontal_offset = (MODE_H_ACTIVE_PIXELS - max_width) / 2;
-
-void measure_freqs(void) {
-    uint f_pll_sys =
-        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
-    uint f_pll_usb =
-        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
-    uint f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
-    uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
-    uint f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
-    uint f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
-    uint f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
-    uint f_clk_hstx = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_HSTX);
-
-    printf("pll_sys  = %dkHz\n", f_pll_sys);
-    // printf("pll_usb  = %dkHz\n", f_pll_usb);
-    // printf("rosc     = %dkHz\n", f_rosc);
-    printf("clk_sys  = %dkHz\n", f_clk_sys);
-    // printf("clk_peri = %dkHz\n", f_clk_peri);
-    printf("clk_usb  = %dkHz\n", f_clk_usb);
-    // printf("clk_adc  = %dkHz\n", f_clk_adc);
-    printf("clk_hstx  = %dkHz\n", f_clk_hstx);
-    // Can't measure clk_ref / xosc as it is the ref
-}
 
 struct mc6847_context {
     unsigned int atom_fb;
@@ -435,14 +412,13 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
 }
 
 pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
-                 pixel_t* p, bool is_debug) {
+                 pixel_t* p) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
     const uint row = (relative_line_num) / 12;  // char row
     const uint sub_row =
         (relative_line_num) % 12;  // scanline within current char row
-    uint sgidx =
-        is_debug ? TEXT_INDEX : GetSAMSG();  // index into semigraphics table
+    uint sgidx = GetSAMSG();  // index into semigraphics table
     const uint rows_per_char =
         12 / sg_bytes_row[sgidx];  // bytes per character space vertically
     const uint8_t* fontdata =
@@ -518,12 +494,8 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                     ((ch >> (pix_row * 2)) & 0x1) ? fg_colour : bg_colour;
                 uint16_t pix1 =
                     ((ch >> (pix_row * 2)) & 0x2) ? fg_colour : bg_colour;
-                for (int i = 0; i < 8; i++) {
-                    *p++ = pix1;
-                }
-                for (int i = 0; i < 8; i++) {
-                    *p++ = pix0;
-                }
+                write_pixel4(&p, pix1);
+                write_pixel4(&p, pix0);
             }
         }
     }
@@ -637,14 +609,11 @@ static inline void draw_line(int line_num, mc6847_context_t* context,
         add_border(p, context->border_colour, MODE_H_ACTIVE_PIXELS);
     } else if (!(context->mode & 1))  // Alphanumeric or Semigraphics
     {
-        // p = add_border(p, context->border_colour, horizontal_offset);
         p += horizontal_offset;
-        do_text(context, relative_line_num / YSCALE, p, false);
-        // add_border(p, context->border_colour, horizontal_offset);
+        do_text(context, relative_line_num / YSCALE, p);
     } else {
-        p = add_border(p, context->border_colour, horizontal_offset);
+        p += horizontal_offset;
         p = do_graphics(p, context, relative_line_num * 2 / YSCALE);
-        add_border(p, context->border_colour, horizontal_offset);
     }
 }
 
@@ -685,34 +654,17 @@ void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
     }
 }
 
-void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
-    // gpio_acknowledge_irq(gpio, events);
-    if (gpio == PIN_NRST) {
-        reset_vga80();
-        as_reset();
-    } else if (gpio == PIN_VSYNC) {
-        vsync_time = get_absolute_time();
-    }
-}
+void mc6847_vsync() { vsync_time = get_absolute_time(); }
+
+void mc6847_reset() { reset_vga80(); }
 
 void mc6847_init() {
     printf("mc6847_init\n");
     teletext_init();
-    measure_freqs();
-
-    gpio_init(PIN_VSYNC);
-    gpio_set_dir(PIN_VSYNC, false);
-    gpio_init(PIN_NRST);
-    gpio_put(PIN_NRST, false);
 
     _context.atom_fb = FB_ADDR;
     _context.mode = 0;
     _context.border_colour = 0;
-
-    gpio_set_irq_callback(gpio_callback);
-    gpio_set_irq_enabled(PIN_VSYNC, GPIO_IRQ_EDGE_RISE, true);
-    gpio_set_irq_enabled(PIN_NRST, GPIO_IRQ_EDGE_RISE, true);
-    irq_set_enabled(IO_IRQ_BANK0, true);
 
     queue_init(&event_queue, sizeof(int), LB_COUNT);
 
@@ -724,15 +676,9 @@ void mc6847_init() {
     initialize_vga80();
 
     eb_init(pio1);
-
-    // toggle the 6502 reset pin
-    gpio_set_dir(PIN_NRST, true);
-    busy_wait_ms(10);
-    gpio_set_dir(PIN_NRST, false);
 }
 
-// run the emulation - this function can be run from both cores simultaneously
-// if necessary to increase performance
+// run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
     uint64_t vsync_time_diff;
     int c = 0;
@@ -750,7 +696,7 @@ void mc6847_run() {
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-                //do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
+                // do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
                 draw_line(next, &_context, p);
             }
         } else {

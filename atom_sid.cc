@@ -30,7 +30,6 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #define C64_CLOCK 1000000
 #define AS_TICK_US 32
 #define AS_SAMPLE_RATE 1000000 / AS_TICK_US
-#define AS_PIN 21
 #define AS_PWM_BITS 11
 #define AS_PWM_WRAP (1 << AS_PWM_BITS)
 
@@ -122,7 +121,7 @@ int debug_count = 0;
 uint16_t debug_buf[500];
 #endif
 
-static inline void do_sample()
+static bool as_timer_callback(repeating_timer_t *)
 {
     // Output current sample
     int sample = sid16->output(AS_PWM_BITS);
@@ -149,25 +148,14 @@ static inline void do_sample()
     sid16->clock(AS_TICK_US);
     // Update the read-only SID regs
     as_update_reg(0x1B, sid16->read(0x1B));
-    as_update_reg(0x1C, sid16->read(0x1C));
+    as_update_reg(0x1C, sid16->read(0x1C));    return true;
 }
-
-static bool as_timer_callback(repeating_timer_t *)
-{
-    do_sample();
-    return true;
-}
-
-repeating_timer_t as_timer;
-
-#define SID_POLL_LOOP 1
 
 extern "C" void as_run()
 {
     printf("as_run()\n");
     eb_set_exclusive_handler(sid_event_handler);
 
-#ifdef SID_POLL_LOOP
     uint32_t last_time = 0;
     for (;;)
     {
@@ -176,10 +164,17 @@ extern "C" void as_run()
         {
             cur_time = time_us_32();
         }
-        do_sample(); 
+        as_timer_callback(NULL); 
     }
-#else
+}
+
+repeating_timer_t as_timer;
+
+extern "C" void as_run_async()
+{
+    printf("as_run_async()\n");
+    eb_set_exclusive_handler(sid_event_handler);
+
     bool ok = add_repeating_timer_us(-(int64_t)AS_TICK_US, as_timer_callback, NULL, &as_timer);
     hard_assert(ok);
-#endif
 }

@@ -52,12 +52,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // matches the Pico DVI Sock board, which can be soldered onto a Pico 2:
 // https://github.com/Wren6991/Pico-DVI-Sock
 
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "videomode.h"
-#include "atom_if.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
@@ -65,10 +61,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
 #include "hardware/structs/sio.h"
-#include "mc6847.h"
-#include "pico/multicore.h"
-#include "pico/sem.h"
-#include "atom_sid.h"
 
 // ----------------------------------------------------------------------------
 // DVI constants
@@ -289,69 +281,3 @@ int hstx_main(void) {
     dma_channel_start(DMACH_PING);
 }
 
-static semaphore_t core1_initted;
-
-void core1_func() {
-    // run sid on this core
-    as_init();
-    mc6847_init();
-
-    sem_release(&core1_initted);
-
-    as_run();
-
-    while (1) {
-        __wfi();
-    }
-}
-
-void beep()
-{
-    gpio_init(21);
-    gpio_set_dir(21, true);
-    gpio_set_drive_strength(21, GPIO_DRIVE_STRENGTH_12MA);
-    for (int i = 0; i < 50; i++)
-    {
-        sleep_ms(1);
-        gpio_put(21, 0);
-        sleep_ms(1);
-        gpio_put(21, 1);
-    }
-}
-
-int main(void) {
-    // initialise the shadow memory
-    for (int i=0; i<EB_BUFFER_LENGTH; i++) {
-        _eb_memory[i] = 0;
-    }
-
-    beep();
-    // Set custom clock speeds
-    if (SYS_CLK_KHZ != REQUIRED_SYS_CLK_KHZ) {
-        set_sys_clock_khz(REQUIRED_SYS_CLK_KHZ, true);
-    }
-    if (SYS_CLK_KHZ != HSTX_CLK_KHZ) {
-        bool ok = clock_configure(clk_hstx, 0,
-                                  CLOCKS_CLK_HSTX_CTRL_AUXSRC_VALUE_CLK_SYS,
-                                  REQUIRED_SYS_CLK_KHZ, HSTX_CLK_KHZ);
-    }
-
-    stdio_uart_init();
-
-    printf("Atom DVI v0.0.3-beta\n");
-
-    // create a semaphore to be posted when initialisation is complete
-    sem_init(&core1_initted, 0, 1);
-
-    dma_claim_mask((1u << DMACH_PING) | (1u << DMACH_PONG));
-
-    multicore_launch_core1(core1_func);
-    sem_acquire_blocking(&core1_initted);
-
-    hstx_main();
-
-    mc6847_run();
-    while (1) {
-        __wfi();
-    }
-}

@@ -396,28 +396,32 @@ void print_pixels(uint16_t p) {
     }
 }
 
-
 void print_font() {
-    for (int r = 0; r < 16; r++) {
-        for (int col = 0; col < 6; col++) {
-            int c = col * 16 + r;
-            printf("// --- %2x ---   ", c);
+    const int noof_chars = 0x60;
+    const int noof_cols = 6;
+    const int noof_rows = (noof_chars + noof_cols - 1) / noof_cols;
+    
+    for (int row = 0; row < noof_rows; row++) {
+        for (int col = 0; col < noof_cols; col++) {
+            int ch = col * noof_rows + row;
+            if (ch < noof_chars) {
+                printf("// --- %2x ---   ", ch + 0x20);
+            }
         }
         putchar('\n');
 
         for (int i = 0; i < FONT2_HEIGHT; i++) {
-            for (int col = 0; col < 6; col++) {
-                int c = col * 16 + r;
-                print_pixels(font[c * FONT2_HEIGHT + i]);
+            for (int col = 0; col < noof_cols; col++) {
+                int ch = col * noof_rows + row;
+                if (ch < noof_chars) {
+                    print_pixels(font[ch * FONT2_HEIGHT + i]);
+                }
             }
             putchar('\n');
-
         }
         putchar('\n');
     }
-    putchar('\n');
 }
-
 
 void teletext_init(void) {
     init_font();

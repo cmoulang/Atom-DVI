@@ -2,6 +2,7 @@
     "files.associations": {
         "dma.h": "c",
         "hstx_ctrl.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "algorithm": "c"
     }
 }

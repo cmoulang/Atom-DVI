@@ -24,9 +24,19 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 #include "videomode.h"
 
-#define PIN_NRST 22
-#define PIN_VSYNC 20
-
+/// @brief initialise
 void mc6847_init();
+
+/// @brief run the emulation (does not return)
 void mc6847_run();
+
+/// @brief reset the mc6847 mode
+void mc6847_reset();
+
+/// @brief external vsync signal
+void mc6847_vsync();
+
+/// @brief get a display line of pixels
+/// @param line_num the line number
+/// @return pointer to a buffer containg the pixels
 pixel_t* getLine(int line_num);
