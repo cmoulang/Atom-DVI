@@ -28,6 +28,9 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define MODE_640x480_60 3
 
 // MODE is defined in CMakeLists.txt
+#ifdef TELETEXT
+#define MODE MODE_720x576_60
+#endif
 
 #if (MODE == MODE_800x600_60)
 #define MODE_H_SYNC_POLARITY 1

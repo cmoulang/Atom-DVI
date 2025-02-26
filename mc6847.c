@@ -237,43 +237,25 @@ int get_mode() {
 }
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
-    **pp = c;
-    *pp += 1;
-#if (XSCALE > 1)
-    **pp = c;
-    *pp += 1;
-#endif
-#if (XSCALE > 2)
-    **pp = c;
-    *pp += 1;
-#endif
-#if (XSCALE > 3)
-    **pp = c;
-    *pp += 1;
-#endif
-}
-
-static inline void write_pixel8(pixel_t** pp, pixel_t c) {
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-}
-
-static inline void write_pixel4(pixel_t** pp, pixel_t c) {
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
-    write_pixel(pp, c);
+    uint16_t* q = (uint16_t*)*pp;
+    q[0] = c | c << 8;
+    *pp += 2;
 }
 
 static inline void write_pixel2(pixel_t** pp, pixel_t c) {
-    write_pixel(pp, c);
-    write_pixel(pp, c);
+    uint32_t* q = (uint32_t*)*pp;
+    q[0] = c | c << 8 | c << 16 | c << 24;
+    *pp += 4;
+}
+
+static inline void write_pixel4(pixel_t** pp, pixel_t c) {
+    write_pixel2(pp, c);
+    write_pixel2(pp, c);
+}
+
+static inline void write_pixel8(pixel_t** pp, pixel_t c) {
+    write_pixel4(pp, c);
+    write_pixel4(pp, c);
 }
 
 static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
@@ -696,8 +678,11 @@ void mc6847_run() {
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-                // do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
+#ifdef TELETEXT                
+                do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
+#else
                 draw_line(next, &_context, p);
+#endif
             }
         } else {
             // -1 means local vsync

@@ -93,11 +93,11 @@ extern "C" void as_init()
     printf("Sample interval: %dus\n", interval);
 
     sid16 = new SID();
-    // sid16->set_chip_model(MOS8580);
-    sid16->set_chip_model(MOS6581);
+    sid16->set_chip_model(MOS8580);
+    // sid16->set_chip_model(MOS6581);
     sid16->reset();
-    bool ok = sid16->set_sampling_parameters(C64_CLOCK, SAMPLE_INTERPOLATE, AS_SAMPLE_RATE);
-    // bool ok = sid16->set_sampling_parameters(C64_CLOCK, SAMPLE_FAST, AS_SAMPLE_RATE);
+    // bool ok = sid16->set_sampling_parameters(C64_CLOCK, SAMPLE_INTERPOLATE, AS_SAMPLE_RATE);
+    bool ok = sid16->set_sampling_parameters(C64_CLOCK, SAMPLE_FAST, AS_SAMPLE_RATE);
     hard_assert(ok);
     sid16->enable_filter(true);
     sid16->enable_external_filter(true);

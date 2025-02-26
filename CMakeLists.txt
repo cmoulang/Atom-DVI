@@ -56,9 +56,10 @@ add_executable(dvi_out_hstx_encoder
 
 target_compile_definitions(dvi_out_hstx_encoder PRIVATE
         # See videomode.h for MODE values
+        TELETEXT=1
         # MODE=MODE_720x576_60
-        MODE=MODE_640x480_60_FAST
-        # MODE=MODE_640x480_60
+        # MODE=MODE_640x480_60_FAST
+        MODE=MODE_640x480_60
 )
 
 pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
