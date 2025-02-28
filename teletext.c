@@ -425,5 +425,5 @@ void print_font() {
 
 void teletext_init(void) {
     init_font();
-    print_font();
+    //print_font();
 }
