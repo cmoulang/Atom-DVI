@@ -169,16 +169,6 @@ const uint max_height = 192 * YSCALE;
 const uint vertical_offset = (MODE_V_ACTIVE_LINES - max_height) / 2;
 const uint horizontal_offset = (MODE_H_ACTIVE_PIXELS - max_width) / 2;
 
-// struct mc6847_context {
-//     unsigned int atom_fb;
-//     int mode;
-//     uint16_t border_colour;
-// };
-
-// typedef struct mc6847_context mc6847_context_t;
-
-// static mc6847_context_t _context = {0};
-
 void reset_vga80() {
     eb_set(COL80_BASE, COL80_OFF);
     eb_set(COL80_FG, 0xB2);
@@ -329,7 +319,6 @@ static inline pixel_t* do_graphics(pixel_t* p, int mode, int atom_fb,
                     write_pixel(&p, (b & 0x1 << 2) ? fg : 0);
                     write_pixel(&p, (b & 0x1 << 1) ? fg : 0);
                     write_pixel(&p, (b & 0x1) ? fg : 0);
-
                 } else {
                     uint32_t word = b;
                     for (uint apixel = 0; apixel < 16; apixel++) {
