@@ -26,13 +26,13 @@ set(PICO_BOARD pico2_w CACHE STRING "Board type")
 
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
-project(dvi_out_hstx_encoder_project)
+project(atom_dvi_project)
 
 pico_sdk_init()
 
-add_executable(dvi_out_hstx_encoder
+add_executable(atom_dvi
         main.c
-        dvi_out_hstx_encoder.c
+        dvi_out_hstx_encoder_mod.c
         atom_if.c
         mc6847.c
         teletext.c
@@ -54,22 +54,22 @@ add_executable(dvi_out_hstx_encoder
         resid-0.16/wave8580_PST.cc      
         )
 
-target_compile_definitions(dvi_out_hstx_encoder PRIVATE
+target_compile_definitions(atom_dvi PRIVATE
         # See videomode.h for MODE values
-        TELETEXT=1
+        # TELETEXT=1
         # MODE=MODE_720x576_60
         # MODE=MODE_640x480_60_FAST
         MODE=MODE_640x480_60
 )
 
-pico_generate_pio_header(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
+pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
-target_include_directories(dvi_out_hstx_encoder PRIVATE
+target_include_directories(atom_dvi PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/images
         )
 
 # pull in common dependencies
-target_link_libraries(dvi_out_hstx_encoder
+target_link_libraries(atom_dvi
         pico_stdlib
         pico_multicore
         hardware_pio
@@ -79,8 +79,8 @@ target_link_libraries(dvi_out_hstx_encoder
         )
 
 # create map/bin/hex/uf2 file etc.
-pico_add_extra_outputs(dvi_out_hstx_encoder)
+pico_add_extra_outputs(atom_dvi)
 
-pico_enable_stdio_uart(dvi_out_hstx_encoder 1)
-pico_set_linker_script(dvi_out_hstx_encoder ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
+pico_enable_stdio_uart(atom_dvi 1)
+pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
 

@@ -1,3 +1,47 @@
+/*
+
+Copyright 2021-2025 Chris Moulang
+
+This file is part of Atom-DVI
+
+Atom-DVI is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+Atom-DVI is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
+
+Based on the Raspberry Pi DVI HSTX example - which has the following copyright/license...
+
+Copyright 2020 (c) 2020 Raspberry Pi (Trading) Ltd.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+   disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
+   disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products
+   derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+
 // Copyright (c) 2024 Raspberry Pi (Trading) Ltd.
 
 // Generate DVI output using the command expander and TMDS encoder in HSTX.
@@ -8,6 +52,9 @@
 // matches the Pico DVI Sock board, which can be soldered onto a Pico 2:
 // https://github.com/Wren6991/Pico-DVI-Sock
 
+
+#include "videomode.h"
+#include "mc6847.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
@@ -15,10 +62,10 @@
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
 #include "hardware/structs/sio.h"
-#include "mountains_640x480_rgb332.h"
+//#include "mountains_640x480_rgb332.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
-#define framebuf mountains_640x480
+//#define framebuf mountains_640x480
 
 // ----------------------------------------------------------------------------
 // DVI constants
@@ -33,17 +80,17 @@
 #define SYNC_V1_H0 (TMDS_CTRL_10 | (TMDS_CTRL_00 << 10) | (TMDS_CTRL_00 << 20))
 #define SYNC_V1_H1 (TMDS_CTRL_11 | (TMDS_CTRL_00 << 10) | (TMDS_CTRL_00 << 20))
 
-#define MODE_H_SYNC_POLARITY 0
-#define MODE_H_FRONT_PORCH 16
-#define MODE_H_SYNC_WIDTH 96
-#define MODE_H_BACK_PORCH 48
-#define MODE_H_ACTIVE_PIXELS 640
+//#define MODE_H_SYNC_POLARITY 0
+//#define MODE_H_FRONT_PORCH 16
+//#define MODE_H_SYNC_WIDTH 96
+//#define MODE_H_BACK_PORCH 48
+//#define MODE_H_ACTIVE_PIXELS 640
 
-#define MODE_V_SYNC_POLARITY 0
-#define MODE_V_FRONT_PORCH 10
-#define MODE_V_SYNC_WIDTH 2
-#define MODE_V_BACK_PORCH 33
-#define MODE_V_ACTIVE_LINES 480
+//#define MODE_V_SYNC_POLARITY 0
+//#define MODE_V_FRONT_PORCH 10
+//#define MODE_V_SYNC_WIDTH 2
+//#define MODE_V_BACK_PORCH 33
+//#define MODE_V_ACTIVE_LINES 480
 
 #define MODE_H_TOTAL_PIXELS                                       \
     (MODE_H_FRONT_PORCH + MODE_H_SYNC_WIDTH + MODE_H_BACK_PORCH + \
@@ -131,12 +178,15 @@ void __scratch_x("") dma_irq_handler() {
         ch->transfer_count = count_of(vactive_line);
         vactive_cmdlist_posted = true;
     } else {
-        ch->read_addr =
-            (uintptr_t)&framebuf[(v_scanline -
-                                  (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES)) *
-                                 MODE_H_ACTIVE_PIXELS];
+        uint x = v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+        ch->read_addr = (uintptr_t)mc6847_get_line_buffer(x);
         ch->transfer_count = MODE_H_ACTIVE_PIXELS / sizeof(uint32_t);
         vactive_cmdlist_posted = false;
+    }
+
+    if (v_scanline == MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH) {
+        // internal vsync
+        mc6847_get_line_buffer(-1);
     }
 
     if (!vactive_cmdlist_posted) {
@@ -158,7 +208,7 @@ static __force_inline uint8_t colour_rgb332(uint8_t r, uint8_t g, uint8_t b) {
 
 void scroll_framebuffer(void);
 
-int main(void) {
+int hstx_main(void) {
     // Configure HSTX's TMDS encoder for RGB332
     hstx_ctrl_hw->expand_tmds = 2 << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
                                 0 << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB |
@@ -241,11 +291,12 @@ int main(void) {
     dma_hw->inte0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler);
     irq_set_enabled(DMA_IRQ_0, true);
+    irq_set_priority(DMA_IRQ_0, 0);
 
     bus_ctrl_hw->priority =
         BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
 
     dma_channel_start(DMACH_PING);
 
-    while (1) __wfi();
+    //while (1) __wfi();
 }

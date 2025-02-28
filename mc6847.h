@@ -39,4 +39,4 @@ void mc6847_vsync();
 /// @brief get a display line of pixels
 /// @param line_num the line number
 /// @return pointer to a buffer containg the pixels
-pixel_t* getLine(int line_num);
+pixel_t* mc6847_get_line_buffer(int line_num);

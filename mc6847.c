@@ -36,11 +36,11 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "teletext.h"
 #include "videomode.h"
 
-// define the number of lines in the line buffer
-#define LB_COUNT 8
+// defines the number of buffers in the line buffer pool
+#define LINE_BUFFER_POOL_COUNT 8
+pixel_t line_buffer_pool[LINE_BUFFER_POOL_COUNT][MODE_H_ACTIVE_PIXELS];
 
-static queue_t event_queue;
-char linebuf[MODE_H_ACTIVE_PIXELS * LB_COUNT];
+static queue_t line_request_queue;
 
 #define FB_ADDR 0x8000
 #define VID_MEM_SIZE 0x2000
@@ -616,11 +616,11 @@ static inline void ascii_to_atom(char* str) {
 /// event queue.
 /// @param line_num the line number
 /// @return MODE_H_ACTIVE_PIXELS pixels
-pixel_t* getLine(const int line_num) {
-    queue_try_add(&event_queue, &line_num);
+pixel_t* mc6847_get_line_buffer(const int line_num) {
+    queue_try_add(&line_request_queue, &line_num);
     if (line_num >= 0) {
-        int buf_index = line_num % LB_COUNT;
-        return &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+        int buf_index = line_num % LINE_BUFFER_POOL_COUNT;
+        return line_buffer_pool[buf_index];
     } else {
         return NULL;
     }
@@ -648,7 +648,7 @@ void mc6847_init() {
     _context.mode = 0;
     _context.border_colour = 0;
 
-    queue_init(&event_queue, sizeof(int), LB_COUNT);
+    queue_init(&line_request_queue, sizeof(int), LINE_BUFFER_POOL_COUNT);
 
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
     eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
@@ -660,17 +660,18 @@ void mc6847_init() {
     eb_init(pio1);
 }
 
+
 // run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
     uint64_t vsync_time_diff;
     int c = 0;
     while (1) {
         int line_num;
-        queue_remove_blocking(&event_queue, &line_num);
+        queue_remove_blocking(&line_request_queue, &line_num);
         if (line_num >= 0) {
-            const int next = (line_num + LB_COUNT - 1) % MODE_V_ACTIVE_LINES;
-            int buf_index = next % LB_COUNT;
-            char* p = &linebuf[buf_index * MODE_H_ACTIVE_PIXELS];
+            const int next = (line_num + LINE_BUFFER_POOL_COUNT - 1) % MODE_V_ACTIVE_LINES;
+            int buf_index = next % LINE_BUFFER_POOL_COUNT;
+            char* p = line_buffer_pool[buf_index];
             _context.mode = get_mode();
             _context.atom_fb = _calc_fb_base();
             _context.border_colour =
