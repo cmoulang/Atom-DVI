@@ -102,6 +102,7 @@ void core1_func() {
     // run sid on this core
     as_init();
     mc6847_init();
+    benchmark_draw_line();
 
     // setup interrupt handler for NRST and VSYNC
     gpio_set_irq_callback(gpio_callback);

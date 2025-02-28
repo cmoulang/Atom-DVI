@@ -32,6 +32,7 @@ pico_sdk_init()
 
 add_executable(atom_dvi
         main.c
+        bench.c
         dvi_out_hstx_encoder_mod.c
         atom_if.c
         mc6847.c

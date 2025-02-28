@@ -169,15 +169,15 @@ const uint max_height = 192 * YSCALE;
 const uint vertical_offset = (MODE_V_ACTIVE_LINES - max_height) / 2;
 const uint horizontal_offset = (MODE_H_ACTIVE_PIXELS - max_width) / 2;
 
-struct mc6847_context {
-    unsigned int atom_fb;
-    int mode;
-    uint16_t border_colour;
-};
+// struct mc6847_context {
+//     unsigned int atom_fb;
+//     int mode;
+//     uint16_t border_colour;
+// };
 
-typedef struct mc6847_context mc6847_context_t;
+// typedef struct mc6847_context mc6847_context_t;
 
-static mc6847_context_t _context = {0};
+// static mc6847_context_t _context = {0};
 
 void reset_vga80() {
     eb_set(COL80_BASE, COL80_OFF);
@@ -258,15 +258,14 @@ static inline void write_pixel8(pixel_t** pp, pixel_t c) {
     write_pixel4(pp, c);
 }
 
-static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
-                                   int _relative_line_num) {
-    const int height = get_height(context->mode);
+static inline pixel_t* do_graphics(pixel_t* p, int mode, int atom_fb,
+                                   int border_colour, int _relative_line_num) {
+    const int height = get_height(mode);
     const int graphics_line_num = (_relative_line_num / 2) * height / 192;
-    const uint vdu_address =
-        context->atom_fb + bytes_per_row(context->mode) * graphics_line_num;
+    const uint vdu_address = atom_fb + bytes_per_row(mode) * graphics_line_num;
     size_t bp = vdu_address;
 
-    const uint pixel_count = get_width(context->mode);
+    const uint pixel_count = get_width(mode);
 
     pixel_t* palette = colour_palette;
     if (alt_colour()) {
@@ -275,7 +274,7 @@ static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
     pixel_t* art_palette =
         (1 == artifact) ? colour_palette_artifact1 : colour_palette_artifact2;
 
-    if (is_colour(context->mode)) {
+    if (is_colour(mode)) {
         uint32_t word = 0;
         for (uint pixel = 0; pixel < pixel_count; pixel++) {
             if ((pixel % 16) == 0) {
@@ -298,23 +297,39 @@ static inline pixel_t* do_graphics(pixel_t* p, mc6847_context_t* context,
             bp += 4;
             if (pixel_count == 256) {
                 if (0 == artifact) {
-                    for (uint32_t mask = 0x80000000; mask > 0;) {
-                        uint16_t colour = (b & mask) ? fg : 0;
-                        write_pixel(&p, colour);
-                        mask = mask >> 1;
+                    write_pixel(&p, (b & 0x1 << 31) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 30) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 29) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 28) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 27) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 26) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 25) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 24) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 23) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 22) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 21) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 20) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 19) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 18) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 17) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 16) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 15) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 14) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 13) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 12) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 11) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 10) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 9) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 8) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 7) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 6) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 5) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 4) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 3) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 2) ? fg : 0);
+                    write_pixel(&p, (b & 0x1 << 1) ? fg : 0);
+                    write_pixel(&p, (b & 0x1) ? fg : 0);
 
-                        colour = (b & mask) ? fg : 0;
-                        write_pixel(&p, colour);
-                        mask = mask >> 1;
-
-                        colour = (b & mask) ? fg : 0;
-                        write_pixel(&p, colour);
-                        mask = mask >> 1;
-
-                        colour = (b & mask) ? fg : 0;
-                        write_pixel(&p, colour);
-                        mask = mask >> 1;
-                    }
                 } else {
                     uint32_t word = b;
                     for (uint apixel = 0; apixel < 16; apixel++) {
@@ -393,14 +408,14 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
     }
 }
 
-pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
-                 pixel_t* p) {
+pixel_t* do_text(int mode, int atom_fb, int border_colour,
+                 unsigned int relative_line_num, pixel_t* p) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
     const uint row = (relative_line_num) / 12;  // char row
     const uint sub_row =
         (relative_line_num) % 12;  // scanline within current char row
-    uint sgidx = GetSAMSG();  // index into semigraphics table
+    uint sgidx = GetSAMSG();       // index into semigraphics table
     const uint rows_per_char =
         12 / sg_bytes_row[sgidx];  // bytes per character space vertically
     const uint8_t* fontdata =
@@ -413,7 +428,7 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
 
         for (int col = 0; col < 32; col++) {
             // Get character data from RAM and extract inv,ag,int/ext
-            uint ch = eb_get(context->atom_fb + vdu_address + col);
+            uint ch = eb_get(atom_fb + vdu_address + col);
             bool inv = (ch & INV_MASK) ? true : false;
             bool as = (ch & AS_MASK) ? true : false;
             bool intext = GetIntExt(ch);
@@ -446,10 +461,14 @@ pixel_t* do_text(mc6847_context_t* context, unsigned int relative_line_num,
                     // The internal character generator is only 6 bits wide,
                     // however external character ROMS are 8 bits wide so we
                     // must handle them here
-                    for (uint8_t mask = 0x80; mask > 0; mask = mask >> 1) {
-                        uint8_t c = (b & mask) ? fg_colour : bg_colour;
-                        write_pixel(&p, c);
-                    }
+                    write_pixel(&p, (b & 0x80) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x40) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x20) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x10) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x08) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x04) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x02) ? fg_colour : bg_colour);
+                    write_pixel(&p, (b & 0x01) ? fg_colour : bg_colour);
                 }
             } else  // Semigraphics
             {
@@ -493,7 +512,8 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
     uint8_t* fd = fonts[fontno].fontdata + sub_row;
 
     if (row < 40) {
-        // Compute the start address of the current row in the Atom framebuffer
+        // Compute the start address of the current row in the Atom
+        // framebuffer
         uint char_addr = GetVidMemBase() + 80 * row;
 
         // Read the VGA80 control registers
@@ -510,8 +530,8 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
         pixel2_t* q = (pixel2_t*)p;
 
         if (vga80_ctrl1 & 0x08) {
-            // Attribute mode enabled, attributes follow the characters in the
-            // frame buffer
+            // Attribute mode enabled, attributes follow the characters in
+            // the frame buffer
             uint attr_addr = char_addr + 80 * 40;
             uint shift = (sub_row >> 1) & 0x06;  // 0, 2 or 4
             // Compute these outside of the for loop for efficiency
@@ -578,24 +598,26 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
             }
         }
     }
-    // The above loops add 80 x 4 = 320 32-bit words, which is 640 16-bit words
+    // The above loops add 80 x 4 = 320 32-bit words, which is 640 16-bit
+    // words
     return p + 640;
 }
 
-static inline void draw_line(int line_num, mc6847_context_t* context,
-                             uint8_t* p) {
+void draw_line(int line_num, int mode, int atom_fb, int border_colour,
+               uint8_t* p) {
     int relative_line_num = line_num - vertical_offset;
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
         // Add top/bottom borders
-        add_border(p, context->border_colour, MODE_H_ACTIVE_PIXELS);
-    } else if (!(context->mode & 1))  // Alphanumeric or Semigraphics
+        add_border(p, border_colour, MODE_H_ACTIVE_PIXELS);
+    } else if (!(mode & 1))  // Alphanumeric or Semigraphics
     {
         p += horizontal_offset;
-        do_text(context, relative_line_num / YSCALE, p);
+        do_text(mode, atom_fb, border_colour, relative_line_num / YSCALE, p);
     } else {
         p += horizontal_offset;
-        p = do_graphics(p, context, relative_line_num * 2 / YSCALE);
+        p = do_graphics(p, mode, atom_fb, border_colour,
+                        relative_line_num * 2 / YSCALE);
     }
 }
 
@@ -644,10 +666,6 @@ void mc6847_init() {
     printf("mc6847_init\n");
     teletext_init();
 
-    _context.atom_fb = FB_ADDR;
-    _context.mode = 0;
-    _context.border_colour = 0;
-
     queue_init(&line_request_queue, sizeof(int), LINE_BUFFER_POOL_COUNT);
 
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
@@ -660,7 +678,6 @@ void mc6847_init() {
     eb_init(pio1);
 }
 
-
 // run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
     uint64_t vsync_time_diff;
@@ -669,20 +686,20 @@ void mc6847_run() {
         int line_num;
         queue_remove_blocking(&line_request_queue, &line_num);
         if (line_num >= 0) {
-            const int next = (line_num + LINE_BUFFER_POOL_COUNT - 1) % MODE_V_ACTIVE_LINES;
+            const int next =
+                (line_num + LINE_BUFFER_POOL_COUNT - 1) % MODE_V_ACTIVE_LINES;
             int buf_index = next % LINE_BUFFER_POOL_COUNT;
             char* p = line_buffer_pool[buf_index];
-            _context.mode = get_mode();
-            _context.atom_fb = _calc_fb_base();
-            _context.border_colour =
-                (_context.mode & 1) ? colour_palette[0] : 0;
+            int mode = get_mode();
+            int atom_fb = _calc_fb_base();
+            int border_colour = (mode & 1) ? colour_palette[0] : 0;
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
-#ifdef TELETEXT                
+#ifdef TELETEXT
                 do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
 #else
-                draw_line(next, &_context, p);
+                draw_line(next, mode, atom_fb, border_colour, p);
 #endif
             }
         } else {
