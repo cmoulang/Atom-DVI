@@ -228,13 +228,13 @@ int get_mode() {
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
     uint16_t* q = (uint16_t*)*pp;
-    q[0] = c | c << 8;
+    q[0] = 0x0101 * c;
     *pp += 2;
 }
 
 static inline void write_pixel2(pixel_t** pp, pixel_t c) {
     uint32_t* q = (uint32_t*)*pp;
-    q[0] = c | c << 8 | c << 16 | c << 24;
+    q[0] = 0x01010101 * c;
     *pp += 4;
 }
 

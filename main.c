@@ -112,14 +112,14 @@ void core1_func() {
 
     sem_release(&core1_initted);
 
-#ifdef TELETEXT                
-    mc6847_run();
-#else
-    as_run();
-#endif
-    // as_run_async();
-    // mc6847_run();
+// #ifdef TELETEXT                
+//     mc6847_run();
+// #else
+//     as_run();
+// #endif
 
+    as_run_async();
+    mc6847_run();
 
     while (1) {
         __wfi();

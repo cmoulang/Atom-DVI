@@ -34,6 +34,8 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 extern uint8_t fontdata_saa5050_b[];
 static uint16_t font[FONT_CHARS * FONT2_HEIGHT];
+static uint16_t graph_font[FONT_CHARS * FONT2_HEIGHT];
+static uint16_t sep_font[FONT_CHARS * FONT2_HEIGHT];
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
     **pp = c;
@@ -48,20 +50,33 @@ static inline int teletext_line_no(int line_num) {
     }
 }
 
-// the 20 lines in the 2x3 graphics are laid out as follows
-//   0  1  2  3  4  5                         14 15 16 17 18 19
-//                     6  7  8  9 10 11 12 13
-static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
+static inline uint16_t lookup_graphic(uint8_t ch, int sub_row, bool separated,
                                       bool second_double) {
     if (second_double) {
         return 0;
     }
+    ch = ch - 0x20;
+
+    const uint16_t* fontdata;
+
+    if (separated) {
+        fontdata = sep_font + sub_row;
+    } else {
+        fontdata = graph_font + sub_row;
+    }
+
+    return fontdata[ch * FONT2_HEIGHT];
+}
+
+// the 20 lines in the 2x3 graphics are laid out as follows
+//   0  1  2  3  4  5                         14 15 16 17 18 19
+//                     6  7  8  9 10 11 12 13
+static inline uint16_t create_graphic(uint8_t c, int sub_row, bool separated) {
     uint16_t left, right;
     if (separated) {
-        left =  0b0111100000000000;
+        left = 0b0111100000000000;
         right = 0b0000000111100000;
-        if (sub_row == 5 || sub_row == 6 || 
-            sub_row == 13 || sub_row == 14||
+        if (sub_row == 5 || sub_row == 6 || sub_row == 13 || sub_row == 14 ||
             sub_row == 0 || sub_row == 19) {
             return 0;
         }
@@ -98,7 +113,7 @@ static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
 static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
                                         bool double_height,
                                         bool second_double) {
-    ch = (ch & 0x7F) - 0x20;
+    ch = ch - 0x20;
 
     const uint16_t* fontdata;
     if (second_double) {
@@ -117,6 +132,30 @@ static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
     return fontdata[ch * FONT2_HEIGHT];
 }
 
+static inline unsigned int bitmap_to_pixels(pixel_t* p, unsigned char fg_colour,
+                                            unsigned char bg_colour,
+                                            unsigned int bitmap) {
+    static unsigned int lut[16] = {
+        0x00000000, 0x01000000, 0x00010000, 0x01010000, 0x00000100, 0x01000100,
+        0x00010100, 0x01010100, 0x00000001, 0x01000001, 0x00010001, 0x01010001,
+        0x00000101, 0x01000101, 0x00010101, 0x01010101,
+    };
+
+    return lut[0xF & bitmap] * fg_colour + lut[0xF & ~bitmap] * bg_colour;
+}
+
+static inline pixel_t* out12_pixels(pixel_t* p, unsigned char fg_colour,
+                                    unsigned char bg_colour,
+                                    unsigned short bitmap) {
+    unsigned int* q = (unsigned int*)p;
+
+    q[0] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 12);
+    q[1] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 8);
+    q[2] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 4);
+
+    return p + 12;
+}
+
 pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     static int next_double = -1;
     static int frame_count = 0;
@@ -133,7 +172,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     bool flash = false;
     bool conceal = false;
     bool double_height = false;
-    bool box = false;
+    // bool box = false;
     bool separated_graphics = false;
     bool hold_graphics = false;
     int last_graph_bitmap = 0;
@@ -141,67 +180,67 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     // Screen is 25 rows x 40 columns
     int relative_line_num = teletext_line_no(line_num);
     if (relative_line_num < 0 || relative_line_num >= TELETEXT_LINES) {
-        for (int i = 0; i < MODE_H_ACTIVE_PIXELS; i++) {
-            *p++ = AT_BLACK;
+        int *q = (int*)p;
+        for (int i = 0; i < MODE_H_ACTIVE_PIXELS/4; i++) {
+            q[i] = AT_BLACK;
         }
-        return p;
+        return p + MODE_H_ACTIVE_PIXELS;
     }
 
     p += (MODE_H_ACTIVE_PIXELS - TELETEXT_H_PIXELS) / 2;
 
     const int row = (relative_line_num) / TELETEXT_ROW_HEIGHT;  // character row
     const int sub_row =
-        (relative_line_num) %
-        TELETEXT_ROW_HEIGHT;  // row within current character (0..19)
+        relative_line_num -
+        (TELETEXT_ROW_HEIGHT * row);  // row within current character (0..19)
 
     // start of frame initialisation
     if (relative_line_num == 0) {
         next_double = -1;
         // toggle the flash flag
-        frame_count = (frame_count + 1) % 58;
-        flash_now = frame_count < 19;
+        frame_count = (frame_count + 1) & 63;
+        flash_now = frame_count < 21;
     };
 
     int ch_index = TELETEXT_PAGE_BUFFER + row * TELETEXT_COLUMNS;
 
     for (int col = 0; col < TELETEXT_COLUMNS; col++) {
-        int ch = eb_get(ch_index++) & 0x7F;
+        int ch = eb_get(ch_index + col) & 0x7F;
+        bool non_printing = (ch < 0x20);
 
         // pre-render
-        switch (ch) {
-            case NORMAL_HEIGHT:
-                if (double_height) {
-                    last_graph_bitmap = 0;
-                    double_height = false;
-                }
-                break;
-            case DOUBLE_HEIGHT:
-                if (next_double != row) {
-                    next_double = row + 1;
-                }
-                if (!double_height) {
-                    last_graph_bitmap = 0;
-                    double_height = true;
-                }
-                break;
+        if (non_printing) {
+            switch (ch) {
+                case NORMAL_HEIGHT:
+                    if (double_height) {
+                        last_graph_bitmap = 0;
+                        double_height = false;
+                    }
+                    break;
+                case DOUBLE_HEIGHT:
+                    if (next_double != row) {
+                        next_double = row + 1;
+                    }
+                    if (!double_height) {
+                        last_graph_bitmap = 0;
+                        double_height = true;
+                    }
+                    break;
 
-            case BLACK_BACKGROUND:
-                bg_colour = AT_BLACK;
-                break;
+                case BLACK_BACKGROUND:
+                    bg_colour = AT_BLACK;
+                    break;
 
-            case NEW_BACKGROUND:
-                bg_colour = fg_colour;
-                break;
+                case NEW_BACKGROUND:
+                    bg_colour = fg_colour;
+                    break;
 
-            case HOLD_GRAPHICS:
-                hold_graphics = true;
-                break;
-
-            default:
-                break;
+                case HOLD_GRAPHICS:
+                    hold_graphics = true;
+                    break;
+            }
         }
 
-        bool non_printing = ((ch & 0x7F) < 0x20);
         uint16_t bitmap;
         if (non_printing) {
             if (is_debug) {
@@ -221,15 +260,10 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 }
             }
         } else {
-            if (graphics) {
-                if (ch >= 0x40 && ch < 0x60) {
-                    bitmap = lookup_character(ch, sub_row, double_height,
-                                              next_double == row);
-                } else {
-                    bitmap = lookup_graphic(ch, sub_row, separated_graphics,
-                                            next_double == row);
-                    last_graph_bitmap = bitmap;
-                }
+            if (graphics && (ch & (0x1 << 5))) {
+                bitmap = lookup_graphic(ch, sub_row, separated_graphics,
+                                        next_double == row);
+                last_graph_bitmap = bitmap;
             } else {
                 bitmap = lookup_character(ch, sub_row, double_height,
                                           next_double == row);
@@ -246,68 +280,62 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 b = AT_BLACK;
             }
             if (sub_row >= 18) {
+                // dotted underline
                 bitmap = 0x9999;
             }
-            for (uint16_t mask = 0x8000; mask >= 0x10; mask = mask >> 1) {
-                uint8_t c = (bitmap & mask) ? f : b;
-                write_pixel(&p, c);
-            }
+            p = out12_pixels(p, f, b, bitmap);
         } else {
             if ((conceal && !reveal) || (flash && flash_now)) {
                 // handle conceal and flash
                 bitmap = 0;
             }
-
-            for (uint16_t mask = 0x8000; mask >= 0x10; mask = mask >> 1) {
-                uint8_t c = (bitmap & mask) ? fg_colour : bg_colour;
-                write_pixel(&p, c);
-            }
+            p = out12_pixels(p, fg_colour, bg_colour, bitmap);
         }
 
         // post-render
-        switch (ch) {
-            case ALPHA_RED ... ALPHA_WHITE:
-                fg_colour = colours[ch & 7];
-                if (graphics) {
-                    last_graph_bitmap = 0;
-                    graphics = false;
-                }
-                conceal = false;
-                break;
-            case FLASH:
-                flash = true;
-                break;
-            case STEADY:
-                flash = false;
-                break;
-            case END_BOX:
-                box = false;
-                break;
-            case START_BOX:
-                box = true;
-                break;
-            case GRAPHICS_RED ... GRAPHICS_WHITE:
-                fg_colour = colours[ch & 7];
-                if (!graphics) {
-                    last_graph_bitmap = 0;
-                    graphics = true;
-                }
-                conceal = false;
-                break;
-            case CONCEAL_DISPLAY:
-                conceal = true;
-                break;
-            case CONTIGUOUS_GRAPHICS:
-                separated_graphics = false;
-                break;
-            case SEPARATED_GRAPHICS:
-                separated_graphics = true;
-                break;
-            case RELEASE_GRAPHICS:
-                hold_graphics = false;
-                break;
-            default:
-                break;
+        if (non_printing) {
+            switch (ch) {
+                case ALPHA_RED ... ALPHA_WHITE:
+                    fg_colour = colours[ch];
+                    if (graphics) {
+                        last_graph_bitmap = 0;
+                        graphics = false;
+                    }
+                    conceal = false;
+                    break;
+                case FLASH:
+                    flash = true;
+                    break;
+                case STEADY:
+                    flash = false;
+                    break;
+                // case END_BOX:
+                //     box = false;
+                //     break;
+                // case START_BOX:
+                //     box = true;
+                //     break;
+                case GRAPHICS_RED ... GRAPHICS_WHITE:
+                    fg_colour = colours[ch & 7];
+                    if (!graphics) {
+                        last_graph_bitmap = 0;
+                        graphics = true;
+                    }
+                    conceal = false;
+                    break;
+                case CONCEAL_DISPLAY:
+                    conceal = true;
+                    break;
+                case CONTIGUOUS_GRAPHICS:
+                    separated_graphics = false;
+                    break;
+                case SEPARATED_GRAPHICS:
+                    separated_graphics = true;
+                    break;
+                case RELEASE_GRAPHICS:
+                    hold_graphics = false;
+                    break;
+            }
         }
     }
     return p;
@@ -384,6 +412,24 @@ void init_font() {
         uint8_t* src = fontdata_saa5050_b + ch * 12;
         dest_ptr = convert_char(dest_ptr, src);
     }
+
+    bool separated = false;
+    dest_ptr = graph_font;
+    for (int ch = 0x20; ch < 0x80; ch += 1) {
+        for (int sub_row = 0; sub_row < 20; sub_row++) {
+            uint16_t src = create_graphic(ch, sub_row, separated);
+            *dest_ptr++ = src;
+        }
+    }
+
+    separated = true;
+    dest_ptr = sep_font;
+    for (int ch = 0x20; ch < 0x80; ch += 1) {
+        for (int row = 0; row < 20; row++) {
+            uint16_t sub_row = create_graphic(ch, row, separated);
+            *dest_ptr++ = sub_row;
+        }
+    }
 }
 
 void print_pixels(uint16_t p) {
@@ -396,11 +442,11 @@ void print_pixels(uint16_t p) {
     }
 }
 
-void print_font() {
+void print_font(uint16_t* font) {
     const int noof_chars = 0x60;
     const int noof_cols = 6;
     const int noof_rows = (noof_chars + noof_cols - 1) / noof_cols;
-    
+
     for (int row = 0; row < noof_rows; row++) {
         for (int col = 0; col < noof_cols; col++) {
             int ch = col * noof_rows + row;
@@ -425,5 +471,5 @@ void print_font() {
 
 void teletext_init(void) {
     init_font();
-    //print_font();
+    print_font(graph_font);
 }
