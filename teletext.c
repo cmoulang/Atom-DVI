@@ -141,7 +141,9 @@ static inline unsigned int bitmap_to_pixels(pixel_t* p, unsigned char fg_colour,
         0x00000101, 0x01000101, 0x00010101, 0x01010101,
     };
 
-    return lut[0xF & bitmap] * fg_colour + lut[0xF & ~bitmap] * bg_colour;
+    unsigned int retval = lut[0xF & bitmap];
+    retval = retval * fg_colour + (retval ^ 0x01010101) * bg_colour;
+    return retval;
 }
 
 static inline pixel_t* out12_pixels(pixel_t* p, unsigned char fg_colour,
