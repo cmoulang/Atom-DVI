@@ -31,13 +31,21 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #define FONT_CHARS 0x60
 #define FONT_HEIGHT 12
 #define FONT2_HEIGHT 20
-#define SPACE 0
 
 extern uint8_t fontdata_saa5050_b[];
-static uint16_t font[FONT_CHARS * FONT2_HEIGHT];
 
-static inline void write_pixel(pixel_t** pp, pixel_t c) {
-    **pp = c;
+typedef unsigned int ff_bitmap_t;
+ff_bitmap_t fast_font[FONT_CHARS * FONT2_HEIGHT * 3] = {0};
+ff_bitmap_t ff_space[] = {0, 0, 0};
+
+static inline ff_bitmap_t* ffont_char(ff_bitmap_t ff_font[], int ch,
+                                      int sub_row) {
+    int index = (ch * FONT2_HEIGHT + sub_row) * 3;
+    return &ff_font[index];
+}
+
+static inline void write_pixel(pixel_t** pp, pixel_t pix) {
+    **pp = pix;
     *pp += 1;
 }
 
@@ -49,59 +57,31 @@ static inline int teletext_line_no(int line_num) {
     }
 }
 
-
-
 /// @brief lookup table for solid graphics
-static uint16_t solid_lut[] = {0b0000000000000000, 0b1111110000000000u,
-                               0b0000001111110000, 0b1111111111110000u};
+static ff_bitmap_t solid_lut[] = {
+    0x00000000, 0x00000000, 0x00000000, 0x01010101, 0x00000101, 0x00000000,
+    0x00000000, 0x01010000, 0x01010101, 0x01010101, 0x01010101, 0x01010101};
 
 /// @brief lookup table for separated graphics
-static uint16_t separated_lut[] = {0b0000000000000000, 0b0111100000000000,
-                                   0b0000000111100000, 0b0111100111100000};
+static ff_bitmap_t separated_lut[] = {
+    0x00000000, 0x00000000, 0x00000000, 0x01010100, 0x00000001, 0x00000000,
+    0x00000000, 0x01000000, 0x00010101, 0x01010100, 0x01000001, 0x00010101};
 
 // the 20 lines in the 2x3 graphics are laid out as follows
 //   0  1  2  3  4  5                         14 15 16 17 18 19
 //                     6  7  8  9 10 11 12 13
-static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
-                                      bool second_double) {
+static inline ff_bitmap_t* lookup_graphic(uint8_t c, int sub_row,
+                                          bool separated, bool second_double) {
     if (second_double) {
-        return SPACE;
+        return ff_space;
     }
     c = c - 0x20;
-
-    int index;
-    if (sub_row < 6) {
-        index = c & 0b11;
-    } else if (sub_row > 13) {
-        index = ((c >> 4) & 1) + ((c >> 5) & 2);
-    } else {  // c >= 7 && c <= 13
-        index = (c >> 2) & 0b11;
-    }
+    ff_bitmap_t* lut;
 
     if (separated) {
         const static int mask = 0b10000110000001100001;
         if ((1 << sub_row) & mask) {
-            return SPACE;
-        };
-        return separated_lut[index];
-    } else {
-        return solid_lut[index];
-    }
-
-}
-
-static inline uint16_t lookup_graphicOLD(uint8_t c, int sub_row, bool separated,
-                                      bool second_double) {
-    if (second_double) {
-        return SPACE;
-    }
-    c = c - 0x20;
-    uint16_t* lut;
-
-    if (separated) {
-        const static int mask = 0b10000110000001100001;
-        if ((1 << sub_row) & mask) {
-            return SPACE;
+            return ff_space;
         };
         lut = separated_lut;
     } else {
@@ -110,66 +90,42 @@ static inline uint16_t lookup_graphicOLD(uint8_t c, int sub_row, bool separated,
 
     if (sub_row < 6) {
         int index = c & 0b11;
-        return lut[index];
+        return &lut[index * 3];
     } else if (sub_row > 13) {
         int index = ((c >> 4) & 1) + ((c >> 5) & 2);
-        return lut[index];
+        return &lut[index * 3];
     } else {  // c >= 7 && c <= 13
         int index = (c >> 2) & 0b11;
-        return lut[index];
+        return &lut[index * 3];
     }
 }
 
-static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
-                                        bool double_height,
-                                        bool second_double) {
+static inline ff_bitmap_t* lookup_character(uint8_t ch, const int sub_row,
+                                            bool double_height,
+                                            bool second_double) {
     ch = ch - 0x20;
-
-    const uint16_t* fontdata;
     if (second_double) {
         if (double_height) {
-            fontdata = font + sub_row / 2 + 10;  // + (10 - 19)
+            return ffont_char(fast_font, ch, sub_row / 2 + 10);  // + (10 - 19)
         } else {
-            return SPACE;
+            return ff_space;
         }
     } else {
         if (double_height) {
-            fontdata = font + sub_row / 2;  // + (0..9)
+            return ffont_char(fast_font, ch, sub_row / 2);  // + (0..9)
         } else {
-            fontdata = font + sub_row;  // font + (0..19)
+            return ffont_char(fast_font, ch, sub_row);  // + (0..19)
         }
     }
-    return fontdata[ch * FONT2_HEIGHT];
-}
-
-/// @brief reverse and expand a 4-bit bitmap.
-/// WXYZ (binary) -> 0Z0Y0X0W (hex)
-/// eg. 0b1011 -> 0x01010001
-/// @param bitmap the bitmap - only first 4 bits are used
-/// @return the expanded bitmap
-static inline unsigned int bitmap_to_uint(unsigned char bitmap) {
-    const int mask = 0x1010101;
-    int x = bitmap;  // & 0xF;
-    x += (x << 9);
-    x += (x << 18);
-    return (x >> 3) & mask;
-}
-
-static inline unsigned int bitmap_to_pixels(pixel_t* p, unsigned char fg_colour,
-                                            unsigned char bg_colour,
-                                            unsigned int bitmap) {
-    unsigned int retval = bitmap_to_uint(bitmap);
-    retval = retval * fg_colour + (retval ^ 0x01010101) * bg_colour;
-    return retval;
 }
 
 static inline pixel_t* out12_pixels(pixel_t* p, unsigned char fg_colour,
-                                    unsigned char bg_colour, uint16_t bitmap) {
+                                    unsigned char bg_colour, ff_bitmap_t* fbm) {
     unsigned int* q = (unsigned int*)p;
 
-    q[0] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 12);
-    q[1] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 8);
-    q[2] = bitmap_to_pixels(p, fg_colour, bg_colour, bitmap >> 4);
+    q[0] = fbm[0] * fg_colour + (fbm[0] ^ 0x01010101) * bg_colour;
+    q[1] = fbm[1] * fg_colour + (fbm[1] ^ 0x01010101) * bg_colour;
+    q[2] = fbm[2] * fg_colour + (fbm[2] ^ 0x01010101) * bg_colour;
 
     return p + 12;
 }
@@ -193,7 +149,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     // bool box = false;
     bool separated_graphics = false;
     bool hold_graphics = false;
-    int last_graph_bitmap = SPACE;
+    ff_bitmap_t* last_graph_bitmap = ff_space;
 
     // Screen is 25 rows x 40 columns
     int relative_line_num = teletext_line_no(line_num);
@@ -231,7 +187,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
             switch (ch) {
                 case NORMAL_HEIGHT:
                     if (double_height) {
-                        last_graph_bitmap = SPACE;
+                        last_graph_bitmap = ff_space;
                         double_height = false;
                     }
                     break;
@@ -240,7 +196,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                         next_double = row + 1;
                     }
                     if (!double_height) {
-                        last_graph_bitmap = SPACE;
+                        last_graph_bitmap = ff_space;
                         double_height = true;
                     }
                     break;
@@ -259,7 +215,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
             }
         }
 
-        uint16_t bitmap;
+        ff_bitmap_t* bitmap = ff_space;
         if (non_printing) {
             if (is_debug) {
                 int temp = ch & 0xF;
@@ -274,7 +230,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 if (hold_graphics) {
                     bitmap = last_graph_bitmap;
                 } else {
-                    bitmap = SPACE;
+                    bitmap = ff_space;
                 }
             }
         } else {
@@ -297,15 +253,11 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 f = AT_ORANGE;
                 b = AT_BLACK;
             }
-            if (sub_row >= 18) {
-                // dotted underline
-                bitmap = 0x9999;
-            }
             p = out12_pixels(p, f, b, bitmap);
         } else {
             if ((conceal && !reveal) || (flash && flash_now)) {
                 // handle conceal and flash
-                bitmap = SPACE;
+                bitmap = ff_space;
             }
             p = out12_pixels(p, fg_colour, bg_colour, bitmap);
         }
@@ -316,7 +268,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 case ALPHA_RED ... ALPHA_WHITE:
                     fg_colour = colours[ch];
                     if (graphics) {
-                        last_graph_bitmap = SPACE;
+                        last_graph_bitmap = ff_space;
                         graphics = false;
                     }
                     conceal = false;
@@ -336,7 +288,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 case GRAPHICS_RED ... GRAPHICS_WHITE:
                     fg_colour = colours[ch & 7];
                     if (!graphics) {
-                        last_graph_bitmap = SPACE;
+                        last_graph_bitmap = ff_space;
                         graphics = true;
                     }
                     conceal = false;
@@ -359,20 +311,7 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     return p;
 }
 
-static inline uint16_t double_pixels(uint8_t src) {
-    uint16_t dst = 0;
-    if (src & 1) dst |= 3;
-    if (src & 2) dst |= 3 << 2;
-    if (src & 4) dst |= 3 << 4;
-    if (src & 8) dst |= 3 << 6;
-    if (src & 0x10) dst |= 3 << 8;
-    if (src & 0x20) dst |= 3 << 10;
-    if (src & 0x40) dst |= 3 << 12;
-    if (src & 0x80) dst |= 3 << 14;
-    return dst;
-}
-
-/// @brief Convert a single saa5050 font character to its rounded version.
+/// @brief Convert a single saa5050 character to its rounded version.
 /// implements the saa5050 character rounding algorithm.
 ///
 /// A B C --\ 1 2
@@ -423,15 +362,46 @@ uint16_t* convert_char(uint16_t* dest_ptr, uint8_t* src_ptr) {
     return dest_ptr;
 }
 
-void init_font() {
-    uint16_t* dest_ptr = font;
-    // convert 12x8 font to 20x16
-    for (int ch = 0; ch < 0x60; ch += 1) {
-        uint8_t* src = fontdata_saa5050_b + ch * 12;
-        dest_ptr = convert_char(dest_ptr, src);
-    }
+/// @brief convert a 4 pixel bitmap to coefficients
+/// @param bitmap
+/// @return
+static inline unsigned int bitmap_to_uint_old(unsigned int bitmap) {
+    static unsigned int lut[16] = {
+        0x00000000, 0x01000000, 0x00010000, 0x01010000,
+        0x00000100, 0x01000100, 0x00010100, 0x01010100, 
+        0x00000001, 0x01000001, 0x00010001, 0x01010001,
+        0x00000101, 0x01000101, 0x00010101, 0x01010101,
+    };
+
+    return lut[0xF & bitmap];
 }
 
+/// @brief reverse and expand a 4-bit bitmap.
+/// WXYZ -> 0x0Z0Y0X0W
+/// eg. 0b1011 -> 0x01010001
+/// @param bitmap the bitmap - only first 4 bits are used
+/// @return the expanded bitmap
+unsigned int bitmap_to_uint(unsigned int bitmap) {
+    const int mask = 0x1010101;
+    int x = bitmap & 0xF;
+    x += (x << 9);
+    x += (x << 18);
+    return (x >> 3) & mask;
+}
+
+/// @brief convert a 12 pixel bitmap to coefficients
+/// @param fb
+/// @param bitmap
+/// @return
+static inline pixel_t* bitmap_to_fbitmap(ff_bitmap_t* fb,
+                                         unsigned short bitmap) {
+    fb[0] = bitmap_to_uint(bitmap >> 12);
+    fb[1] = bitmap_to_uint(bitmap >> 8);
+    fb[2] = bitmap_to_uint(bitmap >> 4);
+}
+
+/// @brief debug print 16 pixels
+/// @param p
 void print_pixels(uint16_t p) {
     for (uint16_t m = 0x8000; m > 0; m = m >> 1) {
         if (m & p) {
@@ -442,34 +412,23 @@ void print_pixels(uint16_t p) {
     }
 }
 
-void print_font(uint16_t* font) {
-    const int noof_chars = 0x60;
-    const int noof_cols = 6;
-    const int noof_rows = (noof_chars + noof_cols - 1) / noof_cols;
+void init_font() {
+    // convert 12x8 font to 20x16 and store in fast_font format
+    for (int ch = 0; ch < 0x60; ch += 1) {
+        uint16_t dest[FONT2_HEIGHT];
+        uint8_t* src = fontdata_saa5050_b + ch * 12;
+        convert_char(&dest[0], src);
 
-    for (int row = 0; row < noof_rows; row++) {
-        for (int col = 0; col < noof_cols; col++) {
-            int ch = col * noof_rows + row;
-            if (ch < noof_chars) {
-                printf("// --- %2x ---   ", ch + 0x20);
-            }
+        for (int sub_row = 0; sub_row < 20; sub_row += 1) {
+            bitmap_to_fbitmap(ffont_char(fast_font, ch, sub_row),
+                              dest[sub_row]);
+            ff_bitmap_t* p = ffont_char(fast_font, ch, sub_row);
         }
-        putchar('\n');
-
-        for (int i = 0; i < FONT2_HEIGHT; i++) {
-            for (int col = 0; col < noof_cols; col++) {
-                int ch = col * noof_rows + row;
-                if (ch < noof_chars) {
-                    print_pixels(font[ch * FONT2_HEIGHT + i]);
-                }
-            }
-            putchar('\n');
-        }
-        putchar('\n');
     }
 }
 
 void teletext_init(void) {
+    printf("teletext init x\n");
     init_font();
-    //    print_font();
+    printf("teletext init - complete\n");
 }

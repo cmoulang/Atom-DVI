@@ -96,6 +96,7 @@ void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
         mc6847_vsync();
     }
 }
+void     benchmark_draw_line();
 
 /// @brief
 void core1_func() {
@@ -118,8 +119,8 @@ void core1_func() {
 //     as_run();
 // #endif
 
-    as_run_async();
-    mc6847_run();
+    as_run();
+    //mc6847_run();
 
     while (1) {
         __wfi();

@@ -55,12 +55,13 @@ add_executable(atom_dvi
         resid-0.16/wave8580_PST.cc      
         )
 
+
 target_compile_definitions(atom_dvi PRIVATE
         # See videomode.h for MODE values
         TELETEXT=1
         # MODE=MODE_720x576_60
         # MODE=MODE_640x480_60_FAST
-        MODE=MODE_640x480_60
+        # MODE=MODE_640x480_60
 )
 
 pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
