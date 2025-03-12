@@ -40,3 +40,6 @@ void mc6847_vsync();
 /// @param line_num the line number
 /// @return pointer to a buffer containg the pixels
 pixel_t* mc6847_get_line_buffer(int line_num);
+
+void draw_line(int line_num, int mode, int atom_fb, int border_colour,
+        unsigned char* p);

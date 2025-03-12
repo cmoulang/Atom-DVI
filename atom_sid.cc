@@ -28,8 +28,8 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #include <stdio.h>
 
 #define C64_CLOCK 1000000
-#define AS_TICK_US 32
-#define AS_SAMPLE_RATE 1000000 / AS_TICK_US
+#define AS_SAMPLE_RATE 50000
+#define AS_TICK_US (C64_CLOCK / AS_SAMPLE_RATE)
 #define AS_PWM_BITS 11
 #define AS_PWM_WRAP (1 << AS_PWM_BITS)
 
@@ -121,7 +121,7 @@ int debug_count = 0;
 uint16_t debug_buf[500];
 #endif
 
-static bool as_timer_callback(repeating_timer_t *)
+static bool __time_critical_func(as_timer_callback)(repeating_timer_t *)
 {
     // Output current sample
     int sample = sid16->output(AS_PWM_BITS);

@@ -228,13 +228,15 @@ int get_mode() {
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
     uint16_t* q = (uint16_t*)*pp;
-    q[0] = 0x0101 * c;
+    q[0] = (c << 8) + c;
     *pp += 2;
 }
 
 static inline void write_pixel2(pixel_t** pp, pixel_t c) {
     uint32_t* q = (uint32_t*)*pp;
-    q[0] = 0x01010101 * c;
+    uint32_t x = (c <<8) + c;
+    x = (x << 16) + x;
+    q[0] = x;
     *pp += 4;
 }
 
@@ -397,7 +399,7 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
     }
 }
 
-pixel_t* do_text(int mode, int atom_fb, int border_colour,
+pixel_t* __not_in_flash_func(do_text)(int mode, int atom_fb, int border_colour,
                  unsigned int relative_line_num, pixel_t* p) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
@@ -498,7 +500,7 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
     uint row = relative_line_num / 12;
     uint sub_row = relative_line_num % 12;
 
-    uint8_t* fd = fonts[fontno].fontdata + sub_row;
+    uint8_t* fd = fonts[FONT_CGA_THIN].fontdata + sub_row;
 
     if (row < 40) {
         // Compute the start address of the current row in the Atom
@@ -658,6 +660,7 @@ void mc6847_init() {
     queue_init(&line_request_queue, sizeof(int), LINE_BUFFER_POOL_COUNT);
 
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
+//    eb_set_perm(FB_ADDR, EB_PERM_READ_WRITE, VID_MEM_SIZE);
     eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);

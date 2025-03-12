@@ -29,6 +29,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "mc6847.h"
 #include "pico/multicore.h"
 #include "pico/sem.h"
+#include "teletext.h"
 #include "videomode.h"
 
 void hstx_main(void);
@@ -88,7 +89,6 @@ void measure_freqs(void) {
 }
 
 void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
-    // gpio_acknowledge_irq(gpio, events);
     if (gpio == PIN_NRST) {
         mc6847_reset();
         as_reset();
@@ -96,14 +96,16 @@ void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
         mc6847_vsync();
     }
 }
-void     benchmark_draw_line();
+
+void benchmark_draw_line();
 
 /// @brief
 void core1_func() {
     // run sid on this core
-    as_init();
     mc6847_init();
+    teletext_init();
     benchmark_draw_line();
+    as_init();
 
     // setup interrupt handler for NRST and VSYNC
     gpio_set_irq_callback(gpio_callback);
@@ -113,14 +115,14 @@ void core1_func() {
 
     sem_release(&core1_initted);
 
-// #ifdef TELETEXT                
-//     mc6847_run();
-// #else
-//     as_run();
-// #endif
+    // #ifdef TELETEXT
+    //     mc6847_run();
+    // #else
+    //     as_run();
+    // #endif
 
     as_run();
-    //mc6847_run();
+    // mc6847_run();
 
     while (1) {
         __wfi();
@@ -172,7 +174,6 @@ int main(void) {
     gpio_set_dir(PIN_NRST, true);
     busy_wait_ms(10);
     gpio_set_dir(PIN_NRST, false);
-
 
     mc6847_run();
     while (1) {

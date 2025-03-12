@@ -49,8 +49,6 @@ static inline int teletext_line_no(int line_num) {
     }
 }
 
-
-
 /// @brief lookup table for solid graphics
 static uint16_t solid_lut[] = {0b0000000000000000, 0b1111110000000000u,
                                0b0000001111110000, 0b1111111111110000u};
@@ -87,38 +85,8 @@ static inline uint16_t lookup_graphic(uint8_t c, int sub_row, bool separated,
     } else {
         return solid_lut[index];
     }
-
 }
 
-static inline uint16_t lookup_graphicOLD(uint8_t c, int sub_row, bool separated,
-                                      bool second_double) {
-    if (second_double) {
-        return SPACE;
-    }
-    c = c - 0x20;
-    uint16_t* lut;
-
-    if (separated) {
-        const static int mask = 0b10000110000001100001;
-        if ((1 << sub_row) & mask) {
-            return SPACE;
-        };
-        lut = separated_lut;
-    } else {
-        lut = solid_lut;
-    }
-
-    if (sub_row < 6) {
-        int index = c & 0b11;
-        return lut[index];
-    } else if (sub_row > 13) {
-        int index = ((c >> 4) & 1) + ((c >> 5) & 2);
-        return lut[index];
-    } else {  // c >= 7 && c <= 13
-        int index = (c >> 2) & 0b11;
-        return lut[index];
-    }
-}
 
 static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
                                         bool double_height,
@@ -149,7 +117,7 @@ static inline uint16_t lookup_character(uint8_t ch, const int sub_row,
 /// @return the expanded bitmap
 static inline unsigned int bitmap_to_uint(unsigned char bitmap) {
     const int mask = 0x1010101;
-    int x = bitmap;  // & 0xF;
+    int x = bitmap & 0xF;
     x += (x << 9);
     x += (x << 18);
     return (x >> 3) & mask;
@@ -174,12 +142,16 @@ static inline pixel_t* out12_pixels(pixel_t* p, unsigned char fg_colour,
     return p + 12;
 }
 
-pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
+static const pixel_t colours[] = {AT_BLACK, AT_RED,     AT_GREEN, AT_YELLOW,
+                                  AT_BLUE,  AT_MAGENTA, AT_CYAN,  AT_WHITE};
+
+pixel_t* do_teletext(pixel_t* _p, size_t len, unsigned int line_num,
+                     unsigned char flags) {
+    pixel_t* retval = _p;
+
     static int next_double = -1;
     static int frame_count = 0;
     static bool flash_now = false;
-    static const pixel_t colours[] = {AT_BLACK, AT_RED,     AT_GREEN, AT_YELLOW,
-                                      AT_BLUE,  AT_MAGENTA, AT_CYAN,  AT_WHITE};
 
     pixel_t fg_colour = AT_WHITE;
     pixel_t bg_colour = AT_BLACK;
@@ -198,14 +170,15 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
     // Screen is 25 rows x 40 columns
     int relative_line_num = teletext_line_no(line_num);
     if (relative_line_num < 0 || relative_line_num >= TELETEXT_LINES) {
-        int* q = (int*)p;
+        int* q = (int*)retval;
         for (int i = 0; i < MODE_H_ACTIVE_PIXELS / 4; i++) {
             q[i] = AT_BLACK;
         }
-        return p + MODE_H_ACTIVE_PIXELS;
+        hard_assert(len == MODE_H_ACTIVE_PIXELS);
+        return retval + MODE_H_ACTIVE_PIXELS;
     }
 
-    p += (MODE_H_ACTIVE_PIXELS - TELETEXT_H_PIXELS) / 2;
+    retval += (MODE_H_ACTIVE_PIXELS - TELETEXT_H_PIXELS) / 2;
 
     const int row = (relative_line_num) / TELETEXT_ROW_HEIGHT;  // character row
     const int sub_row =
@@ -301,13 +274,13 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
                 // dotted underline
                 bitmap = 0x9999;
             }
-            p = out12_pixels(p, f, b, bitmap);
+            retval = out12_pixels(retval, f, b, bitmap);
         } else {
             if ((conceal && !reveal) || (flash && flash_now)) {
                 // handle conceal and flash
                 bitmap = SPACE;
             }
-            p = out12_pixels(p, fg_colour, bg_colour, bitmap);
+            retval = out12_pixels(retval, fg_colour, bg_colour, bitmap);
         }
 
         // post-render
@@ -356,7 +329,8 @@ pixel_t* do_teletext(unsigned int line_num, pixel_t* p, unsigned char flags) {
             }
         }
     }
-    return p;
+    hard_assert((retval - _p) <= len);
+    return retval;
 }
 
 static inline uint16_t double_pixels(uint8_t src) {
