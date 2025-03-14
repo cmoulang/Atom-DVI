@@ -689,7 +689,7 @@ void mc6847_run() {
                 do_text_vga80(next, p);
             } else {
 #ifdef TELETEXT
-                do_teletext(next, p, eb_get(TELETEXT_REG_FLAGS));
+                do_teletext(p, MODE_H_ACTIVE_PIXELS, next, eb_get(TELETEXT_REG_FLAGS));
 #else
                 draw_line(next, mode, atom_fb, border_colour, p);
 #endif
