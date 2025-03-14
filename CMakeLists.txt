@@ -64,6 +64,9 @@ target_compile_definitions(atom_dvi PRIVATE
         # MODE=MODE_640x480_60
 )
 
+pico_set_binary_type(atom_dvi copy_to_ram)
+
+
 pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(atom_dvi PRIVATE
@@ -84,5 +87,6 @@ target_link_libraries(atom_dvi
 pico_add_extra_outputs(atom_dvi)
 
 pico_enable_stdio_uart(atom_dvi 1)
-pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
+# pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
+pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_copy_to_ram.ld)
 
