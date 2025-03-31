@@ -1,0 +1,235 @@
+ca65 V2.18 - N/A
+Main file   : test.s
+Current file: test.s
+
+000000r 1               
+000000r 1               
+000000r 1               YARRB = $BFFE		; YARRB control register
+000000r 1               WRCVEC	= $0208		; OSWRCH vector address
+000000r 1               WRCVEC_DEFAULT = $FE52 ; Normal WRCVEC value
+000000r 1               PORTC = $B002		; PIA port C - bit 2 is connected to the ATOM's loudspeaker
+000000r 1               
+000000r 1               SCRA	= $9C00		; memory addresses for the screen
+000000r 1               SCRB	= $9D00
+000000r 1               SCRC	= $9E00
+000000r 1               SCRD	= $9F00
+000000r 1               CRTA	= $0AFE		; CRT controller
+000000r 1               CRTB	= $0AFF
+000000r 1               
+000000r 1               ; SCAP 	= $90		; column counter?
+000000r 1               ; LINE	= SCAP+1
+000000r 1               ; WORK	= LINE+2
+000000r 1               
+000000r 1               
+000000r 1               LINE = $DE			; DE,DF address of current line
+000000r 1               SCAP = $E0			; horizontal cursor position 0-39
+000000r 1               WORK = $90
+000000r 1               
+000000r 1               SAVEX	= $E4
+000000r 1               SAVEY	= $E5
+000000r 1               
+000000r 1               YARRB_MASK = $FD
+000000r 1               
+000000r 1               CH_SPACE= $20
+000000r 1               CH_DELETE = $7F
+000000r 1               CH_RETURN = $0D
+000000r 1               CH_LINE_FEED = $0A
+000000r 1               CH_FORM_FEED = $0C
+000000r 1               
+000000r 1               INIT_CURSOR_POS = SCRA + 960
+000000r 1               
+000000r 1               
+000000r 1               LINE_LEN = 40
+000000r 1               
+000000r 1               CURSOR_H = $0E
+000000r 1               CURSOR_L = $0F
+000000r 1               
+000000r 1               START_ADD_H = $0C
+000000r 1               START_ADD_L = $0D
+000000r 1               
+000000r 1               	.org	$A00
+000A00  1               
+000A00  1               ; Initialisation
+000A00  1  AD FE BF     	lda YARRB		; Disable YARRB ram at A00-AFF
+000A03  1  29 FD        	and #YARRB_MASK
+000A05  1  8D FE BF     	sta YARRB
+000A08  1  A9 16        	lda #<CHATS		; update WRCVEC subroutine pointer
+000A0A  1  8D 08 02     	sta WRCVEC
+000A0D  1  A9 0A        	lda #>CHATS
+000A0F  1  8D 09 02     	sta WRCVEC+1
+000A12  1  20 79 0A     	jsr CLEARS
+000A15  1  60           	rts
+000A16  1               
+000A16  1               ; CHATS_TST:
+000A16  1               ; 	PHA
+000A16  1               ; 	LDA PORTC
+000A16  1               ; 	EOR #$04
+000A16  1               ; 	STA PORTC
+000A16  1               ; 	PLA
+000A16  1               ; 	JSR WRCVEC_DEFAULT
+000A16  1               ; 	nop
+000A16  1               ; 	RTS
+000A16  1               
+000A16  1               CHATS:
+000A16  1               	;JSR WRCVEC_DEFAULT
+000A16  1  08           	PHP				; Save flags
+000A17  1  48           	PHA				; Save accumulator
+000A18  1  D8           	CLD				; Clera decimal mode
+000A19  1  84 E5        	STY SAVEY		; Save Y register
+000A1B  1  86 E4        	STX SAVEX		; Save X register
+000A1D  1  20 27 0A     	JSR CHATS2		; Send character in accumulator to screen
+000A20  1  68           	PLA				; Restore accumulator
+000A21  1  A6 E4        	LDX SAVEX		; Restore X register
+000A23  1  A4 E5        	LDY SAVEY		; Restore Y register
+000A25  1  28           	PLP				; Restore flags
+000A26  1  60           	RTS
+000A27  1               
+000A27  1               ;  Send ASCII Character to Screen subroutine
+000A27  1               ;  -----------------------------------------
+000A27  1               
+000A27  1               CHATS2:
+000A27  1  A4 E0        	LDY SCAP		; character to screen
+000A29  1  C9 20         	CMP #CH_SPACE
+000A2B  1  90 37         	BCC CTL			; all control characters
+000A2D  1  C9 7F         	CMP #CH_DELETE
+000A2F  1  F0 27         	BEQ DELETE
+000A31  1                TOSCRN:
+000A31  1  20 E6 0A      	JSR WRCH
+000A34  1  C8            	INY
+000A35  1  C0 28         	CPY #LINE_LEN
+000A37  1  90 05         	BCC VDUB	; automatic scroll when line filled
+000A39  1               FILLED:
+000A39  1  20 99 0A      	JSR SCROLL
+000A3C  1               VDUA:
+000A3C  1  A0 00         	LDY #$00
+000A3E  1               VDUB:
+000A3E  1  20 CE 0A      	JSR CALCN
+000A41  1  84 E0         	STY SCAP
+000A43  1  A0 0F         	LDY #CURSOR_L	; rewrite cursor position
+000A45  1  8C FE 0A      	STY CRTA	; select cursor L
+000A48  1  A4 90         	LDY WORK
+000A4A  1  8C FF 0A      	STY CRTB 	; store in cursor L
+000A4D  1  A0 0E         	LDY #CURSOR_H
+000A4F  1  8C FE 0A      	STY CRTA 	; select cursor H
+000A52  1  A4 92         	LDY WORK+02
+000A54  1  8C FF 0A      	STY CRTB	; store in cursor H
+000A57  1               VDUC:
+000A57  1  60            	RTS
+000A58  1               DELETE:
+000A58  1  88            	DEY
+000A59  1  30 FC         	BMI VDUC	; refuse to delete before line start
+000A5B  1  A9 20         	LDA #CH_SPACE	; write in a blank
+000A5D  1  20 E6 0A      	JSR WRCH
+000A60  1  A9 7F         	LDA #CH_DELETE
+000A62  1  D0 DA         	BNE VDUB
+000A64  1               CTL:
+000A64  1  C9 0D         	CMP #CH_RETURN		; carriage return?
+000A66  1  F0 D4         	BEQ VDUA
+000A68  1  C9 0A         	CMP #CH_LINE_FEED	; line feed?
+000A6A  1  F0 06         	BEQ SCROL
+000A6C  1  C9 0C         	CMP #CH_FORM_FEED	; form feed?
+000A6E  1  F0 09         	BEQ CLEARS
+000A70  1  D0 BF         	BNE TOSCRN
+000A72  1               SCROL:
+000A72  1  20 99 0A     	JSR SCROLL	; vscroll screen and rewrite cursor
+000A75  1  A4 E0        	LDY SCAP
+000A77  1  B0 C5        	BCS VDUB
+000A79  1               CLEARS:
+000A79  1  48           	PHA		; clear entire buffer
+000A7A  1  A0 00        	LDY #$00
+000A7C  1  A9 20        	LDA #' '
+000A7E  1               CLEAR:
+000A7E  1  99 00 9C     	STA SCRA,Y
+000A81  1  99 00 9D     	STA SCRB,Y
+000A84  1  99 00 9E     	STA SCRC,Y
+000A87  1  99 00 9F     	STA SCRD,Y
+000A8A  1  C8           	INY
+000A8B  1  D0 F1        	BNE CLEAR
+000A8D  1  84 E0        	STY SCAP	; set column to 0
+000A8F  1               ; 	LDY #$0F
+000A8F  1               ; SETCRT:
+000A8F  1               ; 	STY CRTA	; set up all the CRT parameters
+000A8F  1               ; 	LDA CRTTAB,Y
+000A8F  1               ; 	STA CRTB
+000A8F  1               ; 	DEY
+000A8F  1               ; 	BPL SETCRT
+000A8F  1  A9 C0        	LDA #<INIT_CURSOR_POS
+000A91  1  85 DE        	STA LINE
+000A93  1  A9 9F        	LDA #>INIT_CURSOR_POS
+000A95  1  85 DF        	STA LINE+01
+000A97  1  68           	PLA
+000A98  1  60           	RTS
+000A99  1               SCROLL:
+000A99  1  08           	PHP		; scroll subroutine
+000A9A  1  48           	PHA
+000A9B  1  D8           	CLD
+000A9C  1  A0 28        	LDY #LINE_LEN
+000A9E  1  20 CE 0A     	JSR CALCN
+000AA1  1  A5 90        	LDA WORK
+000AA3  1  85 DE        	STA LINE
+000AA5  1  A5 92        	LDA WORK+02
+000AA7  1  85 DF        	STA LINE+01
+000AA9  1  A0 0D        	LDY #START_ADD_L
+000AAB  1  8C FE 0A     	STY CRTA	; select start address L
+000AAE  1  A5 DE        	LDA LINE
+000AB0  1  38            	SEC
+000AB1  1  E9 C0        	SBC #$C0
+000AB3  1  8D FF 0A     	STA CRTB	; store in start address L
+000AB6  1  88           	DEY
+000AB7  1  8C FE 0A     	STY CRTA	; select start address H
+000ABA  1  A5 92        	LDA WORK+02
+000ABC  1  E9 03        	SBC #$03
+000ABE  1  8D FF 0A     	STA CRTB	; store in start address H
+000AC1  1  A0 27        	LDY #$27
+000AC3  1  A9 20        	LDA #' '
+000AC5  1               CLEARL:
+000AC5  1  20 E6 0A     	JSR WRCH
+000AC8  1  88           	DEY
+000AC9  1  10 FA        	BPL CLEARL
+000ACB  1  68           	PLA
+000ACC  1  28           	PLP
+000ACD  1  60           	RTS
+000ACE  1               CALCN:
+000ACE  1  08           	PHP		; do calculation to make sure that the
+000ACF  1  48           	PHA		; processor and CRT controller agree on
+000AD0  1  D8           	CLD		; position of screen r :
+000AD1  1  18           	CLC
+000AD2  1  98           	TYA				; A <- column
+000AD3  1  65 DE         	ADC LINE		; A <- column + low byte of line start address
+000AD5  1  85 90         	STA WORK		; WORK <- column + low byte of line start address
+000AD7  1  A5 DF         	LDA LINE+01		; A <- high byte of line start address
+000AD9  1  69 00         	ADC #$00		; A <- column + high byte of line start address
+000ADB  1  85 92         	STA WORK+02		; WORK+2 <- column + high byte of line start address
+000ADD  1  29 07         	AND #$07
+000ADF  1  09 9C         	ORA #$9C
+000AE1  1  85 91         	STA WORK+01
+000AE3  1  68           	PLA
+000AE4  1  28           	PLP
+000AE5  1  60           	RTS
+000AE6  1               WRCH:
+000AE6  1  20 CE 0A     	JSR CALCN
+000AE9  1  84 92        	STY WORK+02
+000AEB  1  A0 00        	LDY #$00
+000AED  1  91 90        	STA (WORK),Y
+000AEF  1  A4 92        	LDY WORK+02
+000AF1  1  60           	RTS
+000AF2  1               ; CRTTAB:
+000AF2  1               ;  	.byte $3F ; total number of characters per line,
+000AF2  1               ;  	.byte $28 ; 40 characters displayed
+000AF2  1               ;  	.byte $33 ; position of horizontal sync
+000AF2  1               ;  	.byte $05 ; width in m S of horizontal sync pulse
+000AF2  1               ;  	.byte $1E ; total number of character row
+000AF2  1               ;  	.byte $02 ; additional no. of lines for 312 total
+000AF2  1               ;  	.byte $19 ; 25 displayed character rows
+000AF2  1               ;  	.byte $1B ; position of vertical sync pulse
+000AF2  1               ;  	.byte $00 ; set non-interlace mode
+000AF2  1               ;  	.byte $09 ; set 10 lines per character row
+000AF2  1               ;  	.byte $68 ; slow blink cursor from line 9
+000AF2  1               ;  	.byte $09 ; to line 10
+000AF2  1               ;  	.byte $04 ; high address of VDU ram
+000AF2  1               ;  	.byte $00 ; low address of VDU ram
+000AF2  1               ;  	.byte $07 ; high address of initial cursor position
+000AF2  1               ;  	.byte $C0 ; low address of initial cursor position
+000AF2  1               
+000AF2  1               
+000AF2  1               

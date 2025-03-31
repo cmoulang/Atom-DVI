@@ -88,7 +88,6 @@ static inline void eb_set_perm_byte(uint16_t address, enum eb_perm perm) {
     }
 
     volatile uint8_t *p = (uint8_t *)&_eb_memory[address] + 1;
-    hard_assert(*p == EB_PERM_NONE);
     *p = perm;
 }
 

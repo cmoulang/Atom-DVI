@@ -26,6 +26,7 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #include <hardware/clocks.h>
 #include <math.h>
 #include <stdio.h>
+#include "teletext.h"
 
 #define C64_CLOCK 1000000
 #define AS_SAMPLE_RATE 50000
@@ -73,10 +74,13 @@ extern "C" void __no_inline_not_in_flash_func(sid_event_handler)() {
     dma_hw->intr = 1u << eb_get_event_chan();
     int address = eb_get_event();
     while (address > 0) {
-        if (address >= eb_pico_addr(SID_BASE_ADDR) && address < eb_pico_addr(SID_BASE_ADDR + SID_WRITEABLE))
+        int ad65 = eb_6502_addr(address);
+        if (ad65 >= SID_BASE_ADDR && ad65 < (SID_BASE_ADDR + SID_WRITEABLE))
         {
             as_sid_write(address);
-        }
+        } else if (ad65 == TELETEXT_CRTA || ad65 == TELETEXT_CRTB) {
+            teletext_reg_write(ad65, eb_get(ad65));
+        } 
         address = eb_get_event();
     }
 }

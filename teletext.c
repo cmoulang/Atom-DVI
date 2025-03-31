@@ -35,6 +35,15 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 extern uint8_t fontdata_saa5050_b[];
 static uint16_t font[FONT_CHARS * FONT2_HEIGHT];
+unsigned char teletext_regs[TELETEXT_REG_COUNT] = {0};
+
+static inline int get_start_address() {
+    return teletext_regs[TELETEXT_REG_START_ADDR_H] * 256 + teletext_regs[TELETEXT_REG_START_ADDR_L];
+}
+
+static inline int get_cursor_address() {
+    return ((teletext_regs[TELETEXT_REG_CURSOR_H] * 256 + teletext_regs[TELETEXT_REG_CURSOR_L]) & 0x3FF) + TELETEXT_PAGE_BUFFER;
+}
 
 static inline void write_pixel(pixel_t** pp, pixel_t c) {
     **pp = c;
@@ -152,6 +161,7 @@ pixel_t* do_teletext(pixel_t* _p, size_t len, unsigned int line_num,
     static int next_double = -1;
     static int frame_count = 0;
     static bool flash_now = false;
+    static bool blink_now = false;
 
     pixel_t fg_colour = AT_WHITE;
     pixel_t bg_colour = AT_BLACK;
@@ -191,12 +201,17 @@ pixel_t* do_teletext(pixel_t* _p, size_t len, unsigned int line_num,
         // toggle the flash flag
         frame_count = (frame_count + 1) & 63;
         flash_now = frame_count < 21;
+        blink_now = frame_count < 32;
     };
 
-    int ch_index = TELETEXT_PAGE_BUFFER + row * TELETEXT_COLUMNS;
+    //int ch_index = TELETEXT_PAGE_BUFFER + row * TELETEXT_COLUMNS;
+    int start_address = get_start_address();
+    int start_char = start_address + row * TELETEXT_COLUMNS;
+    int cursor_address = get_cursor_address();
 
     for (int col = 0; col < TELETEXT_COLUMNS; col++) {
-        int ch = eb_get(ch_index + col) & 0x7F;
+        int char_address = ((start_char + col) % 0x400) + TELETEXT_PAGE_BUFFER;
+        int ch = eb_get(char_address) & 0x7F;
         bool non_printing = (ch < 0x20);
 
         // pre-render
@@ -280,7 +295,12 @@ pixel_t* do_teletext(pixel_t* _p, size_t len, unsigned int line_num,
                 // handle conceal and flash
                 bitmap = SPACE;
             }
-            retval = out12_pixels(retval, fg_colour, bg_colour, bitmap);
+            if (char_address == cursor_address && sub_row>=18 && blink_now)
+            {                
+                retval = out12_pixels(retval, AT_WHITE, AT_BLACK, 0xFFFF);
+            } else {
+                retval = out12_pixels(retval, fg_colour, bg_colour, bitmap);
+            }            
         }
 
         // post-render
@@ -444,6 +464,24 @@ void print_font(uint16_t* font) {
 }
 
 void teletext_init(void) {
+    eb_set_perm(TELETEXT_PAGE_BUFFER, EB_PERM_WRITE_ONLY, 0x400);
+    teletext_regs[TELETEXT_REG_CURSOR_H] = TELETEXT_PAGE_BUFFER / 256;
+    teletext_regs[TELETEXT_REG_CURSOR_L] = TELETEXT_PAGE_BUFFER % 256;
+    teletext_regs[TELETEXT_REG_START_ADDR_H] = TELETEXT_PAGE_BUFFER / 256;
+    teletext_regs[TELETEXT_REG_START_ADDR_L] = TELETEXT_PAGE_BUFFER % 256;
+    
     init_font();
-    //    print_font();
+}
+
+
+void teletext_reg_write(int reg, unsigned char val)
+{
+    static int address_reg = 0;
+    if (reg == TELETEXT_CRTA) {
+        address_reg = val;
+    } else if (reg == TELETEXT_CRTB) {
+        if (address_reg >= 0 && address_reg < TELETEXT_REG_COUNT) {
+            teletext_regs[address_reg] = val;
+        }
+    }
 }

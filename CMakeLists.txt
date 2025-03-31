@@ -30,6 +30,21 @@ project(atom_dvi_project)
 
 pico_sdk_init()
 
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_LIST_DIR}/asm/test.h
+    COMMAND ${CMAKE_CURRENT_LIST_DIR}/asm/make.bat
+    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/asm/test.s
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/asm
+    COMMENT "Generating test.h from test.s"
+    VERBATIM
+)
+
+add_custom_target(generate_test_h
+    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/asm/test.h
+    COMMENT "Generating test.h"
+)
+
 add_executable(atom_dvi
         main.c
         bench.c
@@ -38,6 +53,7 @@ add_executable(atom_dvi
         mc6847.c
         teletext.c
         atom_sid.cc
+        asm.c
         resid-0.16/envelope.cc
         resid-0.16/extfilt.cc
         resid-0.16/pot.cc
@@ -54,14 +70,15 @@ add_executable(atom_dvi
         resid-0.16/wave8580_PS_.cc
         resid-0.16/wave8580_PST.cc      
         )
+add_dependencies(atom_dvi generate_test_h)
 
 
 target_compile_definitions(atom_dvi PRIVATE
         # See videomode.h for MODE values
-        TELETEXT=1
+        # TELETEXT=1
         # MODE=MODE_720x576_60
         # MODE=MODE_640x480_60_FAST
-        # MODE=MODE_640x480_60
+        MODE=MODE_640x480_60
 )
 
 pico_set_binary_type(atom_dvi copy_to_ram)
@@ -71,6 +88,7 @@ pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(atom_dvi PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/images
+        ${CMAKE_CURRENT_LIST_DIR}/asm
         )
 
 # pull in common dependencies
@@ -87,6 +105,4 @@ target_link_libraries(atom_dvi
 pico_add_extra_outputs(atom_dvi)
 
 pico_enable_stdio_uart(atom_dvi 1)
-# pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_default.ld)
 pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_copy_to_ram.ld)
-

@@ -228,6 +228,8 @@ void eb_shutdown()
 void eb_set_exclusive_handler(irq_handler_t handler)
 {
     irq_set_exclusive_handler(DMA_IRQ_1, handler);
+    //irq_add_shared_handler(DMA_IRQ_1, handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
+
     irq_set_enabled(DMA_IRQ_1, true);
     irq_set_priority(DMA_IRQ_1, PICO_DEFAULT_IRQ_PRIORITY/2);
 

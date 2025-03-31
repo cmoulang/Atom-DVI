@@ -31,6 +31,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "pico/sem.h"
 #include "teletext.h"
 #include "videomode.h"
+#include "asm.h"
 
 void hstx_main(void);
 #define DMACH_PING 0
@@ -104,7 +105,7 @@ void core1_func() {
     // run sid on this core
     mc6847_init();
     teletext_init();
-    benchmark_draw_line();
+    //benchmark_draw_line();
     as_init();
 
     // setup interrupt handler for NRST and VSYNC
@@ -130,7 +131,7 @@ void core1_func() {
 }
 
 int main(void) {
-    beep(250, 500, -1);
+    //beep(250, 500, -1);
 
     // Set custom clock speeds
     if (SYS_CLK_KHZ != REQUIRED_SYS_CLK_KHZ) {
@@ -168,11 +169,13 @@ int main(void) {
     multicore_launch_core1(core1_func);
     sem_acquire_blocking(&core1_initted);
 
+    // asm_init();
+
     hstx_main();
 
     // toggle the 6502 reset pin
     gpio_set_dir(PIN_NRST, true);
-    busy_wait_ms(10);
+    busy_wait_us(10);
     gpio_set_dir(PIN_NRST, false);
 
     mc6847_run();

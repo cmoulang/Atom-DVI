@@ -67,10 +67,67 @@ enum  saa5050_ctrl {
 #define TELETEXT_COLUMNS 40
 #define TELETEXT_ROWS 25
 #define TELETEXT_H_PIXELS (TELETEXT_COLUMNS * 12)
-#define TELETEXT_PAGE_BUFFER 0x9800
+#define TELETEXT_PAGE_BUFFER 0x9C00
+#define TELETEXT_CRTA 0xAFE
+#define TELETEXT_CRTB 0xAFF
 #define TELETEXT_REG_BASE (TELETEXT_PAGE_BUFFER + TELETEXT_COLUMNS * TELETEXT_ROWS)
 #define TELETEXT_REG_FLAGS (TELETEXT_REG_BASE + 8)
 
-pixel_t* do_teletext(pixel_t* p, size_t len, unsigned int line_num, unsigned char flags);
+/*
+Register
+Address	Function	ProgramUnit	Type	No of
+Bits Used
+Add Function                Unit        Type        Bits
+00	Horizontal total	    char	    Write only	8
+01	Horizontal displayed	"	        "	        8  
+02	H Sync Position	        "	        "	        8
+03	H Sync Width	        "	        "	        4
+04	Vertical total	        char row	"	        7
+05	V total adjust	        scan line	"	        5
+06	Vertical displayed	    char row	"	        7
+07	V sync position	        char row	"	        7
+08	Interlace mode	        -	        "	        2
+09	Max scan line address	scan line	"	        5
+0A	Cursor start	        scan line	"	        5+2
+0B	Cursor end	            scan line	"	        5
+0C	Start address H	        -	        "	        6
+0D	Start address L	        -	        "	        8
+0E	Cursor H	            -	        Read/Write	6
+0F	Cursor L	            -	        Read/Write	8
+10	Light pen H	            -	        Read only	6
+11	Light pen L	            -	        "	        8
+*/
 
+enum teletext_reg {
+    TELETEXT_REG_H_TOTAL = 0,
+    TELETEXT_REG_H_DISPLAYED,
+    TELETEXT_REG_H_SYNC_POS,
+    TELETEXT_REG_H_SYNC_WIDTH,
+    TELETEXT_REG_V_TOTAL,
+    TELETEXT_REG_V_TOTAL_ADJUST,
+    TELETEXT_REG_V_DISPLAYED,
+    TELETEXT_REG_V_SYNC_POS,
+    TELETEXT_REG_INTERLACE,
+    TELETEXT_REG_MAX_SCAN_LINE,
+    TELETEXT_REG_CURSOR_START,
+    TELETEXT_REG_CURSOR_END,
+    TELETEXT_REG_START_ADDR_H,
+    TELETEXT_REG_START_ADDR_L,
+    TELETEXT_REG_CURSOR_H,
+    TELETEXT_REG_CURSOR_L,
+    TELETEXT_REG_LIGHT_PEN_H,
+    TELETEXT_REG_LIGHT_PEN_L,
+    TELETEXT_REG_DEBUG,
+    TELETEXT_REG_COUNT
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+pixel_t* do_teletext(pixel_t* p, size_t len, unsigned int line_num, unsigned char flags);
 void teletext_init(void);
+void teletext_reg_write(int reg, unsigned char val);
+#ifdef __cplusplus
+}
+#endif
