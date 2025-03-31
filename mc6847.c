@@ -613,16 +613,14 @@ void draw_line(int line_num, int mode, int atom_fb, int border_colour,
 }
 
 static inline void ascii_to_atom(char* str) {
-    for (int i = 0; i < strlen(str); i++) {
-        char c = str[i] + 0x20;
-        if (c < 0x80) {
-            c = c ^ 0x60;
+    while (*str != 0) {
+        *str = *str + 0x20;
+        if (*str < 0x80) {
+            *str = *str ^ 0x60;
         }
-        str[i] = c;
+        str++;
     }
 }
-
-#define INFO_STRLEN 12
 
 /// @brief Called from the DMA IRQ routine.
 /// Get the pixels for the given line number and add the line number to the
@@ -665,6 +663,14 @@ void mc6847_init() {
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
+#if RESET == 0
+    for (int i=FB_ADDR; i<FB_ADDR+512; i++) {
+        eb_set(i, 32);
+    }
+    char acorn_atom[] = "ACORN ATOM";
+    ascii_to_atom(acorn_atom);
+    eb_set_chars(FB_ADDR, acorn_atom, sizeof(acorn_atom) - 1);
+#endif
     initialize_vga80();
 
     eb_init(pio1);
