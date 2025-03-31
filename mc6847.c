@@ -657,9 +657,13 @@ void mc6847_init() {
 
     queue_init(&line_request_queue, sizeof(int), LINE_BUFFER_POOL_COUNT);
 
+#if VDU_RAM == 1
+    eb_set_perm(FB_ADDR, EB_PERM_READ_WRITE, VID_MEM_SIZE);
+#else
     eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
-//    eb_set_perm(FB_ADDR, EB_PERM_READ_WRITE, VID_MEM_SIZE);
-    eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
+#endif
+
+eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
