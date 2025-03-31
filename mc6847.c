@@ -234,7 +234,7 @@ static inline void write_pixel(pixel_t** pp, pixel_t c) {
 
 static inline void write_pixel2(pixel_t** pp, pixel_t c) {
     uint32_t* q = (uint32_t*)*pp;
-    uint32_t x = (c <<8) + c;
+    uint32_t x = (c << 8) + c;
     x = (x << 16) + x;
     q[0] = x;
     *pp += 4;
@@ -400,7 +400,8 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
 }
 
 pixel_t* __not_in_flash_func(do_text)(int mode, int atom_fb, int border_colour,
-                 unsigned int relative_line_num, pixel_t* p) {
+                                      unsigned int relative_line_num,
+                                      pixel_t* p) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
     const uint row = (relative_line_num) / 12;  // char row
@@ -651,30 +652,30 @@ void mc6847_vsync() { vsync_time = get_absolute_time(); }
 
 void mc6847_reset() { reset_vga80(); }
 
-void mc6847_init() {
+void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     printf("mc6847_init\n");
     teletext_init();
 
     queue_init(&line_request_queue, sizeof(int), LINE_BUFFER_POOL_COUNT);
 
-#if VDU_RAM == 1
-    eb_set_perm(FB_ADDR, EB_PERM_READ_WRITE, VID_MEM_SIZE);
-#else
-    eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
-#endif
+    if (vdu_ram_enabled) {
+        eb_set_perm(FB_ADDR, EB_PERM_READ_WRITE, VID_MEM_SIZE);
+    } else {
+        eb_set_perm(FB_ADDR, EB_PERM_WRITE_ONLY, VID_MEM_SIZE);
+    }
 
-eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
+    eb_set_perm(0xF000, EB_PERM_WRITE_ONLY, 0x400);
     eb_set_perm_byte(PIA_ADDR, EB_PERM_WRITE_ONLY);
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
-#if RESET == 0
-    for (int i=FB_ADDR; i<FB_ADDR+512; i++) {
-        eb_set(i, 32);
+    if (emulate_reset) {
+        for (int i = FB_ADDR; i < FB_ADDR + 512; i++) {
+            eb_set(i, 32);
+        }
+        char acorn_atom[] = "ACORN ATOM";
+        ascii_to_atom(acorn_atom);
+        eb_set_chars(FB_ADDR, acorn_atom, sizeof(acorn_atom) - 1);
     }
-    char acorn_atom[] = "ACORN ATOM";
-    ascii_to_atom(acorn_atom);
-    eb_set_chars(FB_ADDR, acorn_atom, sizeof(acorn_atom) - 1);
-#endif
     initialize_vga80();
 
     eb_init(pio1);
@@ -699,7 +700,8 @@ void mc6847_run() {
                 do_text_vga80(next, p);
             } else {
 #ifdef TELETEXT
-                do_teletext(p, MODE_H_ACTIVE_PIXELS, next, eb_get(TELETEXT_REG_FLAGS));
+                do_teletext(p, MODE_H_ACTIVE_PIXELS, next,
+                            eb_get(TELETEXT_REG_FLAGS));
 #else
                 draw_line(next, mode, atom_fb, border_colour, p);
 #endif

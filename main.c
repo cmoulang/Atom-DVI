@@ -103,7 +103,7 @@ void benchmark_draw_line();
 /// @brief
 void core1_func() {
     // run sid on this core
-    mc6847_init();
+    mc6847_init(VDU_RAM, RESET==0);
     teletext_init();
     //benchmark_draw_line();
     as_init();

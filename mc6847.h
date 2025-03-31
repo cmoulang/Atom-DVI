@@ -23,9 +23,12 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include "videomode.h"
+#include <stdint.h>
+#include <stdbool.h>
+
 
 /// @brief initialise
-void mc6847_init();
+void mc6847_init(bool vdu_ram_enabled, bool emulate_reset);
 
 /// @brief run the emulation (does not return)
 void mc6847_run();
