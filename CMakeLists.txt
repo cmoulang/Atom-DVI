@@ -79,6 +79,7 @@ target_compile_definitions(atom_dvi PRIVATE
         # MODE=MODE_720x576_60
         # MODE=MODE_640x480_60_FAST
         MODE=MODE_640x480_60
+        RESET=0
 )
 
 pico_set_binary_type(atom_dvi copy_to_ram)

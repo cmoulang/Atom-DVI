@@ -173,10 +173,12 @@ int main(void) {
 
     hstx_main();
 
+#if RESET == 1
     // toggle the 6502 reset pin
     gpio_set_dir(PIN_NRST, true);
     busy_wait_us(10);
     gpio_set_dir(PIN_NRST, false);
+#endif
 
     mc6847_run();
     while (1) {
