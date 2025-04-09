@@ -37,7 +37,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "videomode.h"
 
 // defines the number of buffers in the line buffer pool
-#define LINE_BUFFER_POOL_COUNT 8
+#define LINE_BUFFER_POOL_COUNT 2
 pixel_t line_buffer_pool[LINE_BUFFER_POOL_COUNT][MODE_H_ACTIVE_PIXELS];
 
 static queue_t line_request_queue;
@@ -595,8 +595,8 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
     return p + 640;
 }
 
-void draw_line(int line_num, int mode, int atom_fb, int border_colour,
-               uint8_t* p) {
+void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
+    static int border_colour=0;
     int relative_line_num = line_num - vertical_offset;
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
@@ -604,12 +604,17 @@ void draw_line(int line_num, int mode, int atom_fb, int border_colour,
         add_border(p, border_colour, MODE_H_ACTIVE_PIXELS);
     } else if (!(mode & 1))  // Alphanumeric or Semigraphics
     {
-        p += horizontal_offset;
-        do_text(mode, atom_fb, border_colour, relative_line_num / YSCALE, p);
+        border_colour = AT_BLACK;
+        p = add_border(p, border_colour, horizontal_offset);
+        p = do_text(mode, atom_fb, border_colour, relative_line_num / YSCALE, p);
+        p = add_border(p, border_colour, horizontal_offset);
     } else {
-        p += horizontal_offset;
+        // p += horizontal_offset;
+        border_colour = colour_palette[0];
+        p = add_border(p, border_colour, horizontal_offset);
         p = do_graphics(p, mode, atom_fb, border_colour,
                         relative_line_num * 2 / YSCALE);
+        p = add_border(p, border_colour, horizontal_offset);
     }
 }
 
@@ -648,8 +653,6 @@ void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
     }
 }
 
-void mc6847_vsync() { vsync_time = get_absolute_time(); }
-
 void mc6847_reset() { reset_vga80(); }
 
 void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
@@ -681,10 +684,17 @@ void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     eb_init(pio1);
 }
 
+#define PIN_VSYNC 20
+#define VSYNC_ON -1
+#define VSYNC_OFF -2
+
+void mc6847_vsync(bool value) {
+    int line_num = value ? VSYNC_ON : VSYNC_OFF;
+    queue_try_add(&line_request_queue, &line_num);
+}
+
 // run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
-    uint64_t vsync_time_diff;
-    int c = 0;
     while (1) {
         int line_num;
         queue_remove_blocking(&line_request_queue, &line_num);
@@ -695,7 +705,6 @@ void mc6847_run() {
             char* p = line_buffer_pool[buf_index];
             int mode = get_mode();
             int atom_fb = _calc_fb_base();
-            int border_colour = (mode & 1) ? colour_palette[0] : 0;
             if (eb_get(COL80_BASE) & COL80_ON) {
                 do_text_vga80(next, p);
             } else {
@@ -703,13 +712,11 @@ void mc6847_run() {
                 do_teletext(p, MODE_H_ACTIVE_PIXELS, next,
                             eb_get(TELETEXT_REG_FLAGS));
 #else
-                draw_line(next, mode, atom_fb, border_colour, p);
+                draw_line(next, mode, atom_fb, p);
 #endif
             }
         } else {
-            // -1 means local vsync
-            absolute_time_t t = get_absolute_time();
-            vsync_time_diff = absolute_time_diff_us(vsync_time, t);
+            gpio_put(PIN_VSYNC, line_num == VSYNC_ON);
         }
     }
 }

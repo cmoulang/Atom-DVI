@@ -464,7 +464,7 @@ void print_font(uint16_t* font) {
 }
 
 void teletext_init(void) {
-    eb_set_perm(TELETEXT_PAGE_BUFFER, EB_PERM_WRITE_ONLY, 0x400);
+    //eb_set_perm(TELETEXT_PAGE_BUFFER, EB_PERM_WRITE_ONLY, 0x400);
     teletext_regs[TELETEXT_REG_CURSOR_H] = TELETEXT_PAGE_BUFFER / 256;
     teletext_regs[TELETEXT_REG_CURSOR_L] = TELETEXT_PAGE_BUFFER % 256;
     teletext_regs[TELETEXT_REG_START_ADDR_H] = TELETEXT_PAGE_BUFFER / 256;

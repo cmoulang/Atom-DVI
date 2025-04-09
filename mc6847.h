@@ -22,10 +22,10 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include "videomode.h"
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
+#include "videomode.h"
 
 /// @brief initialise
 void mc6847_init(bool vdu_ram_enabled, bool emulate_reset);
@@ -36,13 +36,13 @@ void mc6847_run();
 /// @brief reset the mc6847 mode
 void mc6847_reset();
 
-/// @brief external vsync signal
-void mc6847_vsync();
+/// @brief emit vsync signal
+/// @param on
+void mc6847_vsync(bool on);
 
 /// @brief get a display line of pixels
 /// @param line_num the line number
 /// @return pointer to a buffer containg the pixels
 pixel_t* mc6847_get_line_buffer(int line_num);
 
-void draw_line(int line_num, int mode, int atom_fb, int border_colour,
-        unsigned char* p);
+void draw_line(int line_num, int mode, int atom_fb, unsigned char* p);

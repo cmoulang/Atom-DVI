@@ -93,8 +93,6 @@ void __no_inline_not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
     if (gpio == PIN_NRST) {
         mc6847_reset();
         as_reset();
-    } else if (gpio == PIN_VSYNC) {
-        mc6847_vsync();
     }
 }
 
@@ -110,7 +108,6 @@ void core1_func() {
 
     // setup interrupt handler for NRST and VSYNC
     gpio_set_irq_callback(gpio_callback);
-    gpio_set_irq_enabled(PIN_VSYNC, GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled(PIN_NRST, GPIO_IRQ_EDGE_RISE, true);
     irq_set_enabled(IO_IRQ_BANK0, true);
 
@@ -159,7 +156,7 @@ int main(void) {
 
     // init GPIO
     gpio_init(PIN_VSYNC);
-    gpio_set_dir(PIN_VSYNC, false);
+    gpio_set_dir(PIN_VSYNC, true);
     gpio_init(PIN_NRST);
     gpio_put(PIN_NRST, false);
 

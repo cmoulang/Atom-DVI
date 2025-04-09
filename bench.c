@@ -24,7 +24,7 @@ void benchmark_draw_line_2(int mode, int atom_fb) {
 
     for (int i = 0; i < num_iterations; i++) {
         start_time = time_us_64();
-        draw_line(i % MODE_V_ACTIVE_LINES, mode, atom_fb, border_colour, 
+        draw_line(i % MODE_V_ACTIVE_LINES, mode, atom_fb, 
                   line_buffer);
         end_time = time_us_64();
         total_time += (end_time - start_time);
