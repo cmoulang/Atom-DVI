@@ -684,15 +684,6 @@ void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     eb_init(pio1);
 }
 
-#define PIN_VSYNC 20
-#define VSYNC_ON -1
-#define VSYNC_OFF -2
-
-void mc6847_vsync(bool value) {
-    int line_num = value ? VSYNC_ON : VSYNC_OFF;
-    queue_try_add(&line_request_queue, &line_num);
-}
-
 // run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
     while (1) {
@@ -716,7 +707,7 @@ void mc6847_run() {
 #endif
             }
         } else {
-            gpio_put(PIN_VSYNC, line_num == VSYNC_ON);
+            // gpio_put(PIN_VSYNC, line_num == VSYNC_ON);
         }
     }
 }

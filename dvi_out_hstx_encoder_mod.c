@@ -162,6 +162,8 @@ static uint v_scanline = 2;
 // post the command list, and another to post the pixels.
 static bool vactive_cmdlist_posted = false;
 
+#define FS_SETPOINT 476
+
 void __scratch_x("") dma_irq_handler() {
     // dma_pong indicates the channel that just finished, which is the one
     // we're about to reload.
@@ -170,15 +172,18 @@ void __scratch_x("") dma_irq_handler() {
     dma_hw->intr = 1u << ch_num;
     dma_pong = !dma_pong;
 
-    const static int vsync_start = MODE_V_TOTAL_LINES - 49;
-    const static int vsync_end = MODE_V_TOTAL_LINES - 2;
+    static bool fs_previous = true;
+    static int fs_measured = FS_SETPOINT;
+    static int fs_error = 0;
+    bool fs_current = gpio_get(PIN_VSYNC);
 
-    if (v_scanline == vsync_start) {
-        mc6847_vsync(false);
-    } else if (v_scanline == vsync_end) {
-        mc6847_vsync(true);
+    if (fs_previous && !fs_current) {
+        // Falling edge of FS has been detected
+        fs_measured = v_scanline;
+        fs_error = fs_measured - FS_SETPOINT;
     }
-
+    fs_previous = fs_current;
+    
     if (v_scanline >= MODE_V_FRONT_PORCH &&
         v_scanline < (MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH)) {
         ch->read_addr = (uintptr_t)vblank_line_vsync_on;
@@ -192,10 +197,20 @@ void __scratch_x("") dma_irq_handler() {
         ch->transfer_count = count_of(vactive_line);
         vactive_cmdlist_posted = true;
     } else {
-        uint x = v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+        uint x = v_scanline -
+                 (MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH + MODE_V_BACK_PORCH);
         ch->read_addr = (uintptr_t)mc6847_get_line_buffer(x);
         ch->transfer_count = MODE_H_ACTIVE_PIXELS / sizeof(uint32_t);
         vactive_cmdlist_posted = false;
+        if (v_scanline == FS_SETPOINT+1) {
+            if (fs_error > 0) {
+                fs_error = 1;
+            } else if (fs_error < 0) {
+                fs_error = 0;
+            }
+            v_scanline = v_scanline - fs_error;
+            fs_error = 0;
+        } 
     }
 
     // if (v_scanline == MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH) {

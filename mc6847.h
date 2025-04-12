@@ -36,9 +36,6 @@ void mc6847_run();
 /// @brief reset the mc6847 mode
 void mc6847_reset();
 
-/// @brief emit vsync signal
-/// @param on
-void mc6847_vsync(bool on);
 
 /// @brief get a display line of pixels
 /// @param line_num the line number
@@ -46,3 +43,5 @@ void mc6847_vsync(bool on);
 pixel_t* mc6847_get_line_buffer(int line_num);
 
 void draw_line(int line_num, int mode, int atom_fb, unsigned char* p);
+
+#define PIN_VSYNC 20
