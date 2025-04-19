@@ -26,6 +26,8 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define MODE_800x600_60 1
 #define MODE_720x576_60 2
 #define MODE_640x480_60 3
+#define MODE_640x480_60_FAST 4
+#define MODE_640x480_60_FAST_DMT 5
 
 // MODE is defined in CMakeLists.txt
 #ifdef TELETEXT
@@ -86,8 +88,8 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define XSCALE 2
 #define YSCALE 2
 
-#define REQUIRED_SYS_CLK_KHZ 126000
-#define HSTX_CLK_KHZ 126000
+#define REQUIRED_SYS_CLK_KHZ 125000
+#define HSTX_CLK_KHZ 125000
 
 #elif (MODE == MODE_640x480_60_FAST)
 #define MODE_H_SYNC_POLARITY 0
@@ -105,8 +107,27 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 #define XSCALE 2
 #define YSCALE 2
 
-#define REQUIRED_SYS_CLK_KHZ 252000
-#define HSTX_CLK_KHZ 126000
+#define REQUIRED_SYS_CLK_KHZ 250000
+#define HSTX_CLK_KHZ 125000
+
+#elif (MODE == MODE_640x480_60_FAST_DMT)
+#define MODE_H_SYNC_POLARITY 0
+#define MODE_H_FRONT_PORCH 8
+#define MODE_H_SYNC_WIDTH 96
+#define MODE_H_BACK_PORCH 40
+#define MODE_H_ACTIVE_PIXELS 640
+
+#define MODE_V_SYNC_POLARITY 0
+#define MODE_V_FRONT_PORCH 2
+#define MODE_V_SYNC_WIDTH 2
+#define MODE_V_BACK_PORCH 25
+#define MODE_V_ACTIVE_LINES 480
+
+#define XSCALE 2
+#define YSCALE 2
+
+#define REQUIRED_SYS_CLK_KHZ 250000
+#define HSTX_CLK_KHZ 125000
 
 #else
 #error "Bad MODE"
