@@ -77,6 +77,7 @@ target_compile_definitions(atom_dvi PRIVATE
         # See videomode.h for MODE values
         # TELETEXT=1
         # MODE=MODE_720x576_60
+        # MODE=MODE_640x480_60_FAST_DST
         MODE=MODE_640x480_60_FAST
         # MODE=MODE_640x480_60
         RESET=0

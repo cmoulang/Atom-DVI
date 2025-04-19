@@ -206,9 +206,9 @@ void __scratch_x("") dma_irq_handler() {
             if (fs_error > 0) {
                 fs_error = 1;
             } else if (fs_error < 0) {
-                fs_error = 0;
+                fs_error = -1;
             }
-            v_scanline = v_scanline - fs_error;
+            //v_scanline = v_scanline - fs_error;
             fs_error = 0;
         } 
     }
