@@ -684,11 +684,21 @@ void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     eb_init(pio1);
 }
 
+#define VSYNC_ON (192 * 2+ vertical_offset)
+#define VSYNC_OFF 0
+
 // run the emulation - can be run from both cores simultaneously
 void mc6847_run() {
     while (1) {
         int line_num;
         queue_remove_blocking(&line_request_queue, &line_num);
+        if (line_num == VSYNC_ON) {
+            gpio_put(PIN_VSYNC, false);
+        } else if (line_num == VSYNC_OFF) {
+            gpio_put(PIN_VSYNC, true);
+        }
+        
+
         if (line_num >= 0) {
             const int next =
                 (line_num + LINE_BUFFER_POOL_COUNT - 1) % MODE_V_ACTIVE_LINES;
@@ -706,8 +716,6 @@ void mc6847_run() {
                 draw_line(next, mode, atom_fb, p);
 #endif
             }
-        } else {
-            // gpio_put(PIN_VSYNC, line_num == VSYNC_ON);
         }
     }
 }

@@ -155,7 +155,7 @@ int main(void) {
 
     // init GPIO
     gpio_init(PIN_VSYNC);
-    gpio_set_dir(PIN_VSYNC, false);
+    gpio_set_dir(PIN_VSYNC, true);
     gpio_init(PIN_NRST);
     gpio_put(PIN_NRST, false);
 
