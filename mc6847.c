@@ -154,8 +154,29 @@ unsigned int get_height(unsigned int mode) {
 };
 
 unsigned int bytes_per_row(unsigned int mode) {
-    return is_colour(mode) ? get_width(mode) * 2 / 8 : get_width(mode) / 8;
+    unsigned int retval;
+    if (!(mode & 1)) {
+        retval = 32;
+    } else if (is_colour(mode)) {
+        retval = get_width(mode) / 4;
+    } else {
+        retval = get_width(mode) / 8;
+    }
+    return retval;
 };
+
+const unsigned int lines_per_row_lookup[] = {6, 6, 6, 4, 4, 2, 2, 2};
+
+unsigned int lines_per_row(unsigned int mode) {
+    unsigned int retval;
+    if (!(mode & 1)) {
+        retval = 24;
+    } else {
+        retval = lines_per_row_lookup[mode/2];
+    }
+    return retval;
+}
+
 
 #define COL80_OFF 0x00
 #define COL80_ON 0x80
@@ -252,10 +273,7 @@ static inline void write_pixel8(pixel_t** pp, pixel_t c) {
 
 static inline pixel_t* do_graphics(pixel_t* p, int mode, int atom_fb,
                                    int border_colour, int _relative_line_num) {
-    const int height = get_height(mode);
-    const int graphics_line_num = (_relative_line_num / 2) * height / 192;
-    const uint vdu_address = atom_fb + bytes_per_row(mode) * graphics_line_num;
-    size_t bp = vdu_address;
+    size_t bp = atom_fb;
 
     const uint pixel_count = get_width(mode);
 
@@ -399,7 +417,7 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
     }
 }
 
-pixel_t* __not_in_flash_func(do_text)(int mode, int atom_fb, int border_colour,
+pixel_t* do_text(int mode, int atom_fb, int border_colour,
                                       unsigned int relative_line_num,
                                       pixel_t* p) {
     // Screen is 16 rows x 32 columns
@@ -414,13 +432,9 @@ pixel_t* __not_in_flash_func(do_text)(int mode, int atom_fb, int border_colour,
         fonts[fontno].fontdata + sub_row;  // Local fontdata pointer
 
     if (row < 16) {
-        // Calc start address for this row
-        uint vdu_address = ((chars_per_row * sg_bytes_row[sgidx]) * row) +
-                           (chars_per_row * (sub_row / rows_per_char));
-
         for (int col = 0; col < 32; col++) {
             // Get character data from RAM and extract inv,ag,int/ext
-            uint ch = eb_get(atom_fb + vdu_address + col);
+            uint ch = eb_get(atom_fb + col);
             bool inv = (ch & INV_MASK) ? true : false;
             bool as = (ch & AS_MASK) ? true : false;
             bool intext = GetIntExt(ch);
@@ -596,8 +610,14 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
 }
 
 void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
-    static int border_colour=0;
+    static int border_colour = 0;
+    static int mem_reg = 0;
     int relative_line_num = line_num - vertical_offset;
+
+    if (relative_line_num == 0) {
+        mem_reg = 0;
+    } 
+    
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
         // Add top/bottom borders
@@ -606,15 +626,18 @@ void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
     {
         border_colour = AT_BLACK;
         p = add_border(p, border_colour, horizontal_offset);
-        p = do_text(mode, atom_fb, border_colour, relative_line_num / YSCALE, p);
+        p = do_text(mode, atom_fb + mem_reg, border_colour, relative_line_num / YSCALE, p);
         p = add_border(p, border_colour, horizontal_offset);
     } else {
-        // p += horizontal_offset;
         border_colour = colour_palette[0];
         p = add_border(p, border_colour, horizontal_offset);
-        p = do_graphics(p, mode, atom_fb, border_colour,
+        p = do_graphics(p, mode, atom_fb + mem_reg, border_colour,
                         relative_line_num * 2 / YSCALE);
         p = add_border(p, border_colour, horizontal_offset);
+    }
+
+    if ((relative_line_num + 1) % lines_per_row(mode) == 0) {
+        mem_reg += bytes_per_row(mode);
     }
 }
 
@@ -640,16 +663,6 @@ pixel_t* mc6847_get_line_buffer(const int line_num) {
         return line_buffer_pool[buf_index];
     } else {
         return NULL;
-    }
-}
-
-volatile absolute_time_t vsync_time = {0};
-
-void __no_inline_not_in_flash_func(nrst_callback)(uint gpio, uint32_t events) {
-    gpio_acknowledge_irq(gpio, events);
-
-    if (events & GPIO_IRQ_EDGE_RISE) {
-        reset_vga80();
     }
 }
 
@@ -684,7 +697,7 @@ void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     eb_init(pio1);
 }
 
-#define VSYNC_ON (192 * 2+ vertical_offset)
+#define VSYNC_ON (192 * 2 + vertical_offset)
 #define VSYNC_OFF 0
 
 // run the emulation - can be run from both cores simultaneously
@@ -692,12 +705,6 @@ void mc6847_run() {
     while (1) {
         int line_num;
         queue_remove_blocking(&line_request_queue, &line_num);
-        if (line_num == VSYNC_ON) {
-            gpio_put(PIN_VSYNC, false);
-        } else if (line_num == VSYNC_OFF) {
-            gpio_put(PIN_VSYNC, true);
-        }
-        
 
         if (line_num >= 0) {
             const int next =
@@ -716,6 +723,12 @@ void mc6847_run() {
                 draw_line(next, mode, atom_fb, p);
 #endif
             }
+        }
+
+        if (line_num == VSYNC_ON) {
+            gpio_put(PIN_VSYNC, false);
+        } else if (line_num == VSYNC_OFF) {
+            gpio_put(PIN_VSYNC, true);
         }
     }
 }
