@@ -610,12 +610,15 @@ uint8_t* do_text_vga80(uint relative_line_num, pixel_t* p) {
 }
 
 void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
+    static int prev_mode = 0;
     static int border_colour = 0;
     static int mem_reg = 0;
+    static int counter = 99;
     int relative_line_num = line_num - vertical_offset;
 
     if (relative_line_num == 0) {
         mem_reg = 0;
+        counter = lines_per_row(mode);
     } 
     
 
@@ -636,8 +639,12 @@ void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
         p = add_border(p, border_colour, horizontal_offset);
     }
 
-    if ((relative_line_num + 1) % lines_per_row(mode) == 0) {
+
+    counter--;
+    if (counter == 0 | prev_mode != mode) {
+        counter = lines_per_row(mode);
         mem_reg += bytes_per_row(mode);
+        prev_mode = mode;
     }
 }
 
