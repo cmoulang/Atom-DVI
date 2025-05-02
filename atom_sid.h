@@ -4,19 +4,19 @@ Interface to resid emulation
 
 Copyright 2021-2025 Chris Moulang
 
-This file is part of AtomVgaSid
+This file is part of Atom-DVI
 
-AtomVgaSid is free software: you can redistribute it and/or modify it under the
+Atom-DVI is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version.
 
-AtomVgaSid is distributed in the hope that it will be useful, but WITHOUT ANY
+Atom-DVI is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
-AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
+Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 
 */
 
@@ -31,6 +31,10 @@ AtomVgaSid. If not, see <https://www.gnu.org/licenses/>.
 #define SID_LEN 29
 #define AS_Q_LENGTH 32
 #define AS_PIN 21
+
+#define SID_RESET 0
+#define SID_SETUP_UI -1
+#define SID_SCREENSHOT -2
 
 #ifdef __cplusplus
 extern "C"
@@ -51,7 +55,7 @@ extern "C"
     static inline void as_reset()
     {
         as_element_t el;
-        el.address = 0;
+        el.address = SID_RESET;
         el.data = 0;
         queue_try_add(&as_q, &el);
     }
