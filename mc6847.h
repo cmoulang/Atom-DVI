@@ -36,6 +36,12 @@ void mc6847_run();
 /// @brief reset the mc6847 mode
 void mc6847_reset();
 
+/// @brief set into 80 column vga mode
+void mc6847_vga_mode();
+
+/// @brief print an acsii string to the VDU 
+/// @param str 
+void mc6847_print(const char* str);
 
 /// @brief get a display line of pixels
 /// @param line_num the line number

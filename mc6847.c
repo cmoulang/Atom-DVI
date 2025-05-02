@@ -658,6 +658,59 @@ static inline void ascii_to_atom(char* str) {
     }
 }
 
+
+static int row = 0;
+static int col = 0;
+
+void mc6847_outc(char c) {
+    if (c == '\n') {
+        row += 1;
+        if (row == 25) {
+            row = 0;
+        }
+        col = 0;
+        return;
+    }
+
+    if (c == '\f') {
+        for (int i = FB_ADDR; i < FB_ADDR + VID_MEM_SIZE; i++) {
+            eb_set(i, 32);
+        }
+        row = 0;
+        col = 0;
+        return;
+    }
+
+    if (eb_get(COL80_BASE) & COL80_ON) {
+        if (c >= 0x60 && c < 0x80) {
+            c = c - 0x20;
+        } else if (c >= 0x40 && c < 0x60) {
+            c = c - 0x40;
+        }
+    } else {
+    c = c + 0x20;
+    if (c < 0x80) {
+        c = c ^ 0x60;
+    }
+}
+    eb_set(0x8000 + row * 80 + col, c);
+    col += 1;
+    if (col == 80) {
+        col = 0;
+        row += 1;
+        if (row == 25) {
+            row = 0;
+        }
+    }
+}
+
+void mc6847_print(const char* str) {
+    while (*str != 0) {
+        mc6847_outc(*str);
+        str++;
+    }
+}
+
 /// @brief Called from the DMA IRQ routine.
 /// Get the pixels for the given line number and add the line number to the
 /// event queue.
@@ -674,6 +727,13 @@ pixel_t* mc6847_get_line_buffer(const int line_num) {
 }
 
 void mc6847_reset() { reset_vga80(); }
+
+void mc6847_vga_mode()
+{
+    reset_vga80();
+    eb_set(COL80_BASE, COL80_ON);
+}
+
 
 void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     printf("mc6847_init\n");
@@ -692,12 +752,7 @@ void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     eb_set_perm_byte(PIA_ADDR + 2, EB_PERM_WRITE_ONLY);
     eb_set_perm(COL80_BASE, EB_PERM_READ_WRITE, 16);
     if (emulate_reset) {
-        for (int i = FB_ADDR; i < FB_ADDR + 512; i++) {
-            eb_set(i, 32);
-        }
-        char acorn_atom[] = "ACORN ATOM";
-        ascii_to_atom(acorn_atom);
-        eb_set_chars(FB_ADDR, acorn_atom, sizeof(acorn_atom) - 1);
+        mc6847_print("\fACORN ATOM");
     }
     initialize_vga80();
 
