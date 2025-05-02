@@ -22,7 +22,6 @@ AtomHDMI. If not, see <https://www.gnu.org/licenses/>.
 
 #include "atom_if.h"
 
-
 volatile uint16_t _Alignas(EB_BUFFER_LENGTH * 2) _eb_memory[EB_BUFFER_LENGTH] __attribute__((section(".uninitialized_dma_buffer")));
 
 #define EB_EVENT_QUEUE_BITS 7
@@ -32,6 +31,7 @@ static volatile _Alignas(1 << EB_EVENT_QUEUE_BITS) uint32_t eb_event_queue[EB_EV
 static PIO eb_pio;
 static uint eb2_address_sm = 0;
 static uint eb2_access_sm = 1;
+static uint eb2_address_sm_offset;
 uint eb_event_chan;
 
 static void eb2_address_program_init(PIO pio, uint sm, bool r65c02mode)
@@ -50,6 +50,7 @@ static void eb2_address_program_init(PIO pio, uint sm, bool r65c02mode)
         c = eb2_addr_other_program_get_default_config(offset);
     }
     hard_assert(offset >= 0);
+    eb2_address_sm_offset = offset;
 
     (pio)->input_sync_bypass = (0xFF << PIN_A0) | (1 << PIN_R_NW);
 
@@ -219,10 +220,28 @@ void eb_init(PIO pio) //, irq_handler_t handler)
     eb_setup_dma(eb_pio, eb2_address_sm, eb2_access_sm);
     pio_enable_sm_mask_in_sync(eb_pio, 1u << eb2_address_sm | 1u << eb2_access_sm);
 }
+void mc6847_print(const char* str);
+void mc6847_vga_mode();
 
-void eb_shutdown()
+static bool is_paused=false;
+void eb_pause()
 {
-    pio_sm_set_enabled(eb_pio, eb2_access_sm, false);
+    if (!is_paused) {
+        pio_sm_exec(eb_pio, eb2_address_sm, pio_encode_irq_clear(false, 0) | pio_encode_sideset_opt(3, 0x7));
+        pio_sm_exec(eb_pio, eb2_address_sm, pio_encode_wait_irq(true, false, 0) | pio_encode_sideset_opt(3, 0x7));
+        is_paused = true;
+    }
+}
+
+bool eb_resume()
+{
+    bool retval = is_paused;
+    if (is_paused) {
+        pio_sm_exec(eb_pio, eb2_address_sm, pio_encode_jmp(eb2_address_sm_offset) | pio_encode_sideset_opt(3, 0x7));
+        pio_sm_exec(eb_pio, eb2_address_sm, pio_encode_irq_set(false, 0) | pio_encode_sideset_opt(3, 0x7));
+        is_paused = false;
+    }
+    return retval;
 }
 
 void eb_set_exclusive_handler(irq_handler_t handler)
