@@ -67,8 +67,12 @@ enum eb_perm
 /// @param pio the pio instance to use
 void eb_init(PIO pio);
 
-/// @brief shutdown the 6502 bus interface prior to reset
-void eb_shutdown();
+/// @brief pause the 6502 bus interface
+void eb_pause();
+
+/// @brief resume the 6502 bus interface following a pause
+bool eb_resume();
+
 
 static int perm_high = 0;
 static int perm_low = EB_ADDRESS_HIGH;
