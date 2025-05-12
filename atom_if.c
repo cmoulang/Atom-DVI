@@ -220,8 +220,6 @@ void eb_init(PIO pio) //, irq_handler_t handler)
     eb_setup_dma(eb_pio, eb2_address_sm, eb2_access_sm);
     pio_enable_sm_mask_in_sync(eb_pio, 1u << eb2_address_sm | 1u << eb2_access_sm);
 }
-void mc6847_print(const char* str);
-void mc6847_vga_mode();
 
 static bool is_paused=false;
 void eb_pause()

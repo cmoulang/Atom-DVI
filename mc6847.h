@@ -43,6 +43,13 @@ void mc6847_vga_mode();
 /// @param str 
 void mc6847_print(const char* str);
 
+void mc6847_outc(char c);
+
+/// @brief move cursor to column x, row y
+/// @param x 
+/// @param y 
+void mc6847_moveto(int x, int y);
+
 /// @brief get a display line of pixels
 /// @param line_num the line number
 /// @return pointer to a buffer containg the pixels

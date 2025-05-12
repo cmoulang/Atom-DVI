@@ -81,7 +81,9 @@ extern "C" void __no_inline_not_in_flash_func(sid_event_handler)() {
             as_sid_write(address);
         } else if (ad65 == TELETEXT_CRTA || ad65 == TELETEXT_CRTB) {
             teletext_reg_write(ad65, eb_get(ad65));
-        } 
+        } else if (ad65 >= 0x100 && ad65 < 0x120) {
+            ui_post_event(KEY_PRESS, eb_get(ad65));
+        }
         address = eb_get_event();
     }
 }
@@ -117,6 +119,8 @@ extern "C" void as_init()
 
     eb_set_perm(SID_BASE_ADDR, EB_PERM_WRITE_ONLY, SID_WRITEABLE);
     eb_set_perm(SID_BASE_ADDR + SID_WRITEABLE, EB_PERM_READ_ONLY, 4);
+    eb_set_perm(0x100, EB_PERM_WRITE_ONLY, 0x20);
+
     as_update_reg(0x19, 0xFF);
     as_update_reg(0x1A, 0xFF);
 }
@@ -170,18 +174,7 @@ extern "C" void as_run()
             cur_time = time_us_32();
         }
         as_timer_callback(NULL);
-        ui_event_t uev;
-        while (ui_get_event(&uev)) {
-
-            if (uev.type == DOUBLE_BREAK) {
-                printf("DOUBLE BREAK\n");
-                ui_run();
-            } else if (uev.type == BREAK) {
-                printf("BREAK\n");
-            } else if (uev.type == KEY_PRESS) {
-                printf("KEY PRESS %x\n", uev.key);
-            }
-        }
+        ui_run();
     }
 }
 

@@ -54,6 +54,7 @@ add_executable(atom_dvi
         teletext.c
         atom_sid.cc
         asm.c
+        ui.c
         resid-0.16/envelope.cc
         resid-0.16/extfilt.cc
         resid-0.16/pot.cc
@@ -81,7 +82,7 @@ target_compile_definitions(atom_dvi PRIVATE
         MODE=MODE_640x480_60_FAST
         # MODE=MODE_640x480_60
         RESET=0
-        VDU_RAM=0
+        VDU_RAM=1
 )
 
 pico_set_binary_type(atom_dvi copy_to_ram)

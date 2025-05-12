@@ -27,9 +27,15 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #define UI_Q_LENGTH 32
 
 typedef enum {
+    DEBOUNCE_0,
+    DEBOUNCE_1,
+    KEY_DOWN,
+    KEY_UP,
     KEY_PRESS,
-    BREAK,
-    DOUBLE_BREAK,
+    BREAK_KEY_DOWN,
+    BREAK_KEY_UP,
+    CAPTURE_KEY_DOWN,
+    CAPTURE_KEY_UP,
 } ui_event_enum;
 
 struct ui_event {
@@ -44,7 +50,6 @@ extern "C" {
 #endif
 
 bool ui_post_event(ui_event_enum type, char key);
-bool ui_get_event(ui_event_t *type);
 void ui_init();
 void ui_run();
 

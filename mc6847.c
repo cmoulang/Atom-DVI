@@ -172,11 +172,10 @@ unsigned int lines_per_row(unsigned int mode) {
     if (!(mode & 1)) {
         retval = 24;
     } else {
-        retval = lines_per_row_lookup[mode/2];
+        retval = lines_per_row_lookup[mode / 2];
     }
     return retval;
 }
-
 
 #define COL80_OFF 0x00
 #define COL80_ON 0x80
@@ -418,8 +417,7 @@ static inline void do_string(pixel_t* p, uint sub_row, char* str) {
 }
 
 pixel_t* do_text(int mode, int atom_fb, int border_colour,
-                                      unsigned int relative_line_num,
-                                      pixel_t* p) {
+                 unsigned int relative_line_num, pixel_t* p) {
     // Screen is 16 rows x 32 columns
     // Each char is 12 x 8 pixels
     const uint row = (relative_line_num) / 12;  // char row
@@ -619,8 +617,7 @@ void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
     if (relative_line_num == 0) {
         mem_reg = 0;
         counter = lines_per_row(mode);
-    } 
-    
+    }
 
     if (relative_line_num < 0 || relative_line_num >= max_height) {
         // Add top/bottom borders
@@ -629,7 +626,8 @@ void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
     {
         border_colour = AT_BLACK;
         p = add_border(p, border_colour, horizontal_offset);
-        p = do_text(mode, atom_fb + mem_reg, border_colour, relative_line_num / YSCALE, p);
+        p = do_text(mode, atom_fb + mem_reg, border_colour,
+                    relative_line_num / YSCALE, p);
         p = add_border(p, border_colour, horizontal_offset);
     } else {
         border_colour = colour_palette[0];
@@ -638,7 +636,6 @@ void draw_line(int line_num, int mode, int atom_fb, uint8_t* p) {
                         relative_line_num * 2 / YSCALE);
         p = add_border(p, border_colour, horizontal_offset);
     }
-
 
     counter--;
     if (counter == 0 | prev_mode != mode) {
@@ -658,11 +655,17 @@ static inline void ascii_to_atom(char* str) {
     }
 }
 
-
 static int row = 0;
 static int col = 0;
 
+void mc6847_moveto(int x, int y) {
+    row = y;
+    col = x;
+}
+
 void mc6847_outc(char c) {
+    static int state = 0;
+
     if (c == '\n') {
         row += 1;
         if (row == 25) {
@@ -673,7 +676,7 @@ void mc6847_outc(char c) {
     }
 
     if (c == '\f') {
-        for (int i = FB_ADDR; i < FB_ADDR + VID_MEM_SIZE; i++) {
+        for (int i = FB_ADDR; i < FB_ADDR + 80 * 40; i++) {
             eb_set(i, 32);
         }
         row = 0;
@@ -688,11 +691,12 @@ void mc6847_outc(char c) {
             c = c - 0x40;
         }
     } else {
-    c = c + 0x20;
-    if (c < 0x80) {
-        c = c ^ 0x60;
+        c = c + 0x20;
+        if (c < 0x80) {
+            c = c ^ 0x60;
+        }
     }
-}
+
     eb_set(0x8000 + row * 80 + col, c);
     col += 1;
     if (col == 80) {
@@ -728,12 +732,15 @@ pixel_t* mc6847_get_line_buffer(const int line_num) {
 
 void mc6847_reset() { reset_vga80(); }
 
-void mc6847_vga_mode()
-{
-    reset_vga80();
+void mc6847_vga_mode() {
     eb_set(COL80_BASE, COL80_ON);
+    eb_set(COL80_FG, 0xba);
+    eb_set(COL80_BG, 0);
+    eb_set(COL80_STAT, 0x12);
+    for (int i = 0x8c80; i< 0x8c80+80*40; i++) {
+        eb_set(i, 23);
+    }
 }
-
 
 void mc6847_init(bool vdu_ram_enabled, bool emulate_reset) {
     printf("mc6847_init\n");
