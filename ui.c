@@ -47,12 +47,18 @@ bool ui_post_event(ui_event_enum type, char key) {
     return queue_try_add(&ui_q, &event);
 }
 
-#define LOWER_RIGHT_CORNER 0x79
-#define UPPER_RIGHT_CORNER 0x62
-#define UPPER_LEFT_CORNER 0x7A
-#define LOWER_LEFT_CORNER 0x60
-#define VERTICAL_LINE 0x66
-#define HORIZONTAL_LINE 0x64
+// #define LOWER_RIGHT_CORNER 0x79
+// #define UPPER_RIGHT_CORNER 0x62
+// #define UPPER_LEFT_CORNER 0x7A
+// #define LOWER_LEFT_CORNER 0x60
+// #define VERTICAL_LINE 0x66
+// #define HORIZONTAL_LINE 0x64
+#define LOWER_RIGHT_CORNER '+'
+#define UPPER_RIGHT_CORNER '+'
+#define UPPER_LEFT_CORNER '+'
+#define LOWER_LEFT_CORNER '+'
+#define VERTICAL_LINE ':'
+#define HORIZONTAL_LINE '-'
 #define SCREEN_WIDTH 80
 #define SCREEN_HEIGHT 40
 
