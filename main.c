@@ -34,6 +34,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include "asm.h"
 #include "time.h"
 #include "ui.h"
+#include "capture.h"
 
 void hstx_main(void);
 #define DMACH_PING 0
@@ -161,6 +162,7 @@ void core1_func() {
     //benchmark_draw_line();
     as_init();
     ui_init();
+    capture_init();
 
     // setup interrupt handler for NRST
     key_state_init(&break_key_state);

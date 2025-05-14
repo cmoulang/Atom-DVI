@@ -3,3 +3,5 @@
 #include <stdlib.h>
 
 void capture();
+void capture_task();
+void capture_init();

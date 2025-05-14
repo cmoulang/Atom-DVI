@@ -158,4 +158,5 @@ void ui_run() {
             capture();
         }
     }
+    capture_task();
 }

@@ -59,6 +59,7 @@ add_executable(atom_dvi
         atom_sid.cc
         asm.c
         ui.c
+        msc_app.c
         ${TOP}/lib/fatfs/source/ff.c
         ${TOP}/lib/fatfs/source/ffsystem.c
         ${TOP}/lib/fatfs/source/ffunicode.c
@@ -91,6 +92,7 @@ target_compile_definitions(atom_dvi PRIVATE
         # MODE=MODE_640x480_60
         RESET=0
         VDU_RAM=1
+        TEST=1
 )
 
 pico_set_binary_type(atom_dvi copy_to_ram)
@@ -102,6 +104,7 @@ target_include_directories(atom_dvi PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/images
         ${CMAKE_CURRENT_LIST_DIR}/asm
+        ${TOP}/lib/fatfs/source/
         )
 
 
@@ -120,6 +123,6 @@ target_link_libraries(atom_dvi
 
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(atom_dvi)
-
 pico_enable_stdio_uart(atom_dvi 1)
+
 pico_set_linker_script(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/memmap_copy_to_ram.ld)
