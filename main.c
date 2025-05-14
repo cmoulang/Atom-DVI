@@ -101,7 +101,7 @@ struct  key_state {
 typedef struct key_state key_state_t;
 
 void key_state_init(key_state_t *key_state) {
-    key_state->previoius_state = false;
+    key_state->previoius_state = true;
     key_state->debounce_timeout = nil_time;
 }
 
@@ -203,7 +203,8 @@ int main(void) {
         hard_assert(clock_ok);
     }
 
-    stdio_uart_init();
+    stdio_init_all();
+
     printf("Atom DVI v1.0.0\n");
     measure_freqs();
 

@@ -31,6 +31,10 @@ project(atom_dvi_project)
 pico_sdk_init()
 
 
+set(TOP ${PICO_SDK_PATH}/lib/tinyusb)
+message(STATUS "TOP is set to ${TOP}")
+
+
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_LIST_DIR}/asm/test.h
     COMMAND ${CMAKE_CURRENT_LIST_DIR}/asm/make.bat
@@ -55,6 +59,9 @@ add_executable(atom_dvi
         atom_sid.cc
         asm.c
         ui.c
+        ${TOP}/lib/fatfs/source/ff.c
+        ${TOP}/lib/fatfs/source/ffsystem.c
+        ${TOP}/lib/fatfs/source/ffunicode.c
         capture.c
         resid-0.16/envelope.cc
         resid-0.16/extfilt.cc
@@ -92,12 +99,17 @@ pico_set_binary_type(atom_dvi copy_to_ram)
 pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(atom_dvi PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/images
         ${CMAKE_CURRENT_LIST_DIR}/asm
         )
 
+
+
 # pull in common dependencies
 target_link_libraries(atom_dvi
+        tinyusb_host
+        tinyusb_board
         pico_stdlib
         pico_multicore
         hardware_pio
