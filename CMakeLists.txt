@@ -55,6 +55,7 @@ add_executable(atom_dvi
         atom_sid.cc
         asm.c
         ui.c
+        capture.c
         resid-0.16/envelope.cc
         resid-0.16/extfilt.cc
         resid-0.16/pot.cc

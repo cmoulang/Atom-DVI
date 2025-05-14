@@ -26,6 +26,7 @@ Atom-DVI. If not, see <https://www.gnu.org/licenses/>.
 #include <stdlib.h>
 
 #include "atom_if.h"
+#include "capture.h"
 #include "licence.h"
 #include "mc6847.h"
 #include "pico/util/queue.h"
@@ -63,9 +64,9 @@ bool ui_post_event(ui_event_enum type, char key) {
 #define SCREEN_HEIGHT 40
 
 /// @brief output a graphics char at the specified location
-/// @param row 
-/// @param col 
-/// @param c 
+/// @param row
+/// @param col
+/// @param c
 static void putgr(int row, int col, char c) {
     eb_set(0x8000 + row * 80 + col, c);
 }
@@ -85,7 +86,7 @@ static void draw_box(int x, int y, int width, int height) {
     }
 }
 
-void mui_left_justified_msgbox(char *str, int height, int width) {
+void mui_left_justified_msgbox(char* str, int height, int width) {
     assert(str);
     assert(height > 0);
     assert(width > 0);
@@ -122,7 +123,6 @@ void mui_left_justified_msgbox(char *str, int height, int width) {
     free(str);
 }
 
-
 static void display_licence() {
     mc6847_vga_mode();
     mc6847_print("\f");
@@ -155,7 +155,7 @@ void ui_run() {
         } else if (event.type == KEY_PRESS) {
             printf("key press %x\n", event.key);
         } else if (event.type == CAPTURE_KEY_DOWN) {
-            printf("capture key down\n");
+            capture();
         }
     }
 }
