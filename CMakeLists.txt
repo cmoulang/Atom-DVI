@@ -49,39 +49,30 @@ add_custom_target(generate_test_h
     COMMENT "Generating test.h"
 )
 
-add_executable(atom_dvi
-        main.c
-        bench.c
-        dvi_out_hstx_encoder_mod.c
-        atom_if.c
-        mc6847.c
-        teletext.c
-        atom_sid.cc
+set(SOURCE_FILES
         asm.c
-        ui.c
+        atom_if.c
+        atom_sid.cc
+        bench.c
+        capture.c
+        dvi_out_hstx_encoder_mod.c
+        main.c
+        mc6847.c
         msc_app.c
+        teletext.c
+        ui.c
         ${TOP}/lib/fatfs/source/ff.c
         ${TOP}/lib/fatfs/source/ffsystem.c
         ${TOP}/lib/fatfs/source/ffunicode.c
-        capture.c
-        resid-0.16/envelope.cc
-        resid-0.16/extfilt.cc
-        resid-0.16/pot.cc
-        resid-0.16/filter.cc
-        resid-0.16/sid.cc
-        resid-0.16/voice.cc
-        resid-0.16/wave.cc
-        resid-0.16/wave6581__ST.cc
-        resid-0.16/wave6581_P_T.cc
-        resid-0.16/wave6581_PS_.cc
-        resid-0.16/wave6581_PST.cc
-        resid-0.16/wave8580__ST.cc
-        resid-0.16/wave8580_P_T.cc
-        resid-0.16/wave8580_PS_.cc
-        resid-0.16/wave8580_PST.cc      
-        )
-add_dependencies(atom_dvi generate_test_h)
+)
 
+include(resid-0.16/Library.cmake)
+
+add_executable(atom_dvi
+        ${SOURCE_FILES}
+)
+
+add_dependencies(atom_dvi generate_test_h)
 
 target_compile_definitions(atom_dvi PRIVATE
         # See videomode.h for MODE values
@@ -92,7 +83,6 @@ target_compile_definitions(atom_dvi PRIVATE
         # MODE=MODE_640x480_60
         RESET=0
         VDU_RAM=1
-        TEST=1
 )
 
 pico_set_binary_type(atom_dvi copy_to_ram)
@@ -102,11 +92,9 @@ pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(atom_dvi PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/images
         ${CMAKE_CURRENT_LIST_DIR}/asm
         ${TOP}/lib/fatfs/source/
         )
-
 
 
 # pull in common dependencies
