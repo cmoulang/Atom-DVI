@@ -67,6 +67,7 @@ set(SOURCE_FILES
 )
 
 include(resid-0.16/Library.cmake)
+include(lpng/Library.cmake)
 
 add_executable(atom_dvi
         ${SOURCE_FILES}
