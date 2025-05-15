@@ -66,8 +66,15 @@ set(SOURCE_FILES
         ${TOP}/lib/fatfs/source/ffunicode.c
 )
 
+set(INCLUDE_DIRS
+        ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/asm
+        ${TOP}/lib/fatfs/source/
+)
+
 include(resid-0.16/Library.cmake)
 include(lpng/Library.cmake)
+include(zlib/Library.cmake)
 
 add_executable(atom_dvi
         ${SOURCE_FILES}
@@ -84,7 +91,7 @@ target_compile_definitions(atom_dvi PRIVATE
         # MODE=MODE_640x480_60
         RESET=0
         VDU_RAM=1
-)
+        )
 
 pico_set_binary_type(atom_dvi copy_to_ram)
 
@@ -92,9 +99,7 @@ pico_set_binary_type(atom_dvi copy_to_ram)
 pico_generate_pio_header(atom_dvi ${CMAKE_CURRENT_LIST_DIR}/sm.pio)
 
 target_include_directories(atom_dvi PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/asm
-        ${TOP}/lib/fatfs/source/
+        ${INCLUDE_DIRS}
         )
 
 
