@@ -3,6 +3,7 @@
         "dma.h": "c",
         "hstx_ctrl.h": "c",
         "stdbool.h": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "pngpriv.h": "c"
     }
 }
